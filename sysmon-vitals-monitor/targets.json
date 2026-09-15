@@ -1,0 +1,21 @@
+[
+  {
+    "id": "1",
+    "name": "Cloudflare DNS",
+    "host": "1.1.1.1",
+    "method": "ping"
+  },
+  {
+    "id": "2",
+    "name": "Google DNS",
+    "host": "8.8.8.8",
+    "method": "tcp",
+    "port": 53
+  },
+  {
+    "id": "c43860e0",
+    "name": "192.168.1.7",
+    "host": "192.168.1.7",
+    "method": "ping"
+  }
+]
