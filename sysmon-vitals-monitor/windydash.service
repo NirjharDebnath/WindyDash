@@ -1,5 +1,6 @@
 [Unit]
-Description=WindyDash Telemetry Daemon & Web Dashboard
+Description=WindyDash Telemetry Daemon & Web Dashboard | Live on http://127.0.0.1:4040 | Requires Authentication
+Documentation=file:/home/nirjhar/Python Codes/Einstein/WindyDash/sysmon-vitals-monitor/README.md
 After=network-online.target
 Wants=network-online.target
 
@@ -12,9 +13,7 @@ Restart=on-failure
 RestartSec=3
 
 # Environment
-Environment=SYSMON_HOST=0.0.0.0
-Environment=SYSMON_PORT=8765
-Environment=SYSMON_INTERVAL=1.0
+EnvironmentFile=/home/nirjhar/Python Codes/Einstein/WindyDash/sysmon-vitals-monitor/.env
 
 # Clean shutdown handling
 KillSignal=SIGTERM

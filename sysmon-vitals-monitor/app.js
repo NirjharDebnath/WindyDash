@@ -1,5 +1,13 @@
+let authToken = sessionStorage.getItem("dash_token");
+if (!authToken) {
+    authToken = prompt("Enter WindyDash Password:");
+    if (authToken) {
+        sessionStorage.setItem("dash_token", authToken);
+    }
+}
 const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
-const WS_URL = protocol + (window.location.host || "localhost:8765") + "/ws";const MAX_POINTS = 60;
+const host = window.location.host || "127.0.0.1:4040";
+const MAX_POINTS = 60;
 let ws, retryTimer, latest = null;
 const history = {cpu:[], mem:[], swap:[], rx:[], tx:[], read:[], write:[], load:[], time:[]};
 
@@ -378,30 +386,40 @@ function renderGpu(g) {
 
 function connect() {
     clearTimeout(retryTimer);
-    ws = new WebSocket(WS_URL);
+    const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    const host = window.location.host || "localhost:8765";
+    
+    // Pass token in handshake
+    ws = new WebSocket(`${protocol}${host}/ws?token=${encodeURIComponent(authToken)}`);
 
     ws.onopen = () => {
         $("daemonStatus").textContent = "● Connected";
         $("daemonStatus").className = "status connected";
     };
 
-    ws.onmessage = e => {
+    ws.onclose = (e) => {
+        $("daemonStatus").textContent = "● Sleeping";
+        $("daemonStatus").className = "status disconnected";
+        
+        // Handle Wrong Password
+        if (e.code === 1008) {
+            sessionStorage.removeItem("dash_token");
+            alert("Incorrect password. Please reload to try again.");
+            return; 
+        }
+        retryTimer = setTimeout(connect, 3000);
+    };
+    ws.onmessage = (event) => {
         try {
-            const data = JSON.parse(e.data);
-            if (data.type === "hardware" || data.cpu) {
+            const data = JSON.parse(event.data);
+            if (data.type === "hardware") {
                 updateHardware(data);
             } else if (data.type === "network_targets") {
                 updateNetworkTargets(data);
             }
         } catch (err) {
-            console.error(err);
+            console.error("Failed to parse websocket data:", err);
         }
-    };
-
-    ws.onclose = () => {
-        $("daemonStatus").textContent = "● Offline";
-        $("daemonStatus").className = "status disconnected";
-        retryTimer = setTimeout(connect, 2000);
     };
 
     ws.onerror = () => ws.close();
@@ -414,7 +432,14 @@ connect();
 
 async function fetchDeviceStatus() {
     try {
-        const res = await fetch("/api/device-status");
+        // Example modification for consumeStream:
+        const res = await fetch("/api/device-status", {
+            method: "GET",
+            headers: { 
+                "Content-Type": "application/json",
+                "X-Auth-Token": authToken 
+            },
+        });
         const data = await res.json();
         $("deviceStatusGrid").innerHTML = `
             <div class="stat"><label>Hostname</label><b>${esc(data.hostname)}</b></div>
@@ -460,7 +485,8 @@ $("targetForm").onsubmit = async (e) => {
     try {
         const res = await fetch("/api/targets", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json",
+                        "X-Auth-Token": authToken },
             body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error("Failed to add target");
@@ -489,7 +515,9 @@ async function consumeStream(url, payload, outputEl) {
     try {
         const res = await fetch(url, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json",
+                        "X-Auth-Token": authToken
+                    },
             body: JSON.stringify(payload)
         });
         
@@ -552,7 +580,14 @@ $("btnSpeedtest").onclick = async () => {
     btn.disabled = true;
     
     try {
-        const res = await fetch("/api/speedtest", { method: "POST" });
+        // Example modification for consumeStream:
+        const res = await fetch("/api/speedtest", {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",
+                "X-Auth-Token": authToken 
+            },
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         
         const reader = res.body.getReader();
@@ -596,4 +631,3 @@ $("btnSpeedtest").onclick = async () => {
         btn.disabled = false;
     }
 };
-

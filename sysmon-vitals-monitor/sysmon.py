@@ -16,21 +16,47 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
-
 import httpx
 import psutil
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import hmac
+from collections import defaultdict
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, Depends, status
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 # Anchor file lookups to the script's actual directory
 BASE_DIR = Path(__file__).resolve().parent
 TARGETS_FILE = BASE_DIR / "targets.json"
 
-POLL_SECONDS = float(os.getenv("SYSMON_INTERVAL", "1.0"))
-HOST = os.getenv("SYSMON_HOST", "0.0.0.0")
-PORT = int(os.getenv("SYSMON_PORT", "8765"))
+POLL_SECONDS = float(os.getenv("SYSMON_INTERVAL"))
+HOST = os.getenv("SYSMON_HOST")
+PORT = int(os.getenv("SYSMON_PORT"))
+AUTH_TOKEN = os.getenv("DASH_PASSWORD")
+
+# Anti-DDoS Rate Limiter state
+RATE_LIMIT = 20  # Max 20 requests
+RATE_WINDOW = 5  # Per 5 seconds
+ip_request_history = defaultdict(list)
+has_active_viewers = asyncio.Event()
+
+def check_auth(request: Request):
+    token = request.headers.get("X-Auth-Token", "")
+    if not hmac.compare_digest(token, AUTH_TOKEN):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+def rate_limiter(request: Request):
+    client_ip = request.client.host
+    now = time.monotonic()
+    ip_request_history[client_ip] = [t for t in ip_request_history[client_ip] if now - t < RATE_WINDOW]
+    if len(ip_request_history[client_ip]) >= RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Rate limit exceeded.")
+    ip_request_history[client_ip].append(now)
+
+secure_api = [Depends(check_auth), Depends(rate_limiter)]
 
 def read_text(path):
     try: return Path(path).read_text(errors="ignore").strip()
@@ -52,6 +78,9 @@ class HardwareMonitor:
         self.session_start_net = psutil.net_io_counters() # Tracks session rx/tx
         self.prev_time = time.monotonic()
         self.gpu = self.detect_gpu()
+        self.last_heavy_check = 0
+        self.cached_proc = []
+        self.cached_gpu = []
 
     def meminfo(self):
         out = {}
@@ -244,6 +273,22 @@ class HardwareMonitor:
     def collect(self):
         now = time.monotonic()
         dt = max(now - self.prev_time, 0.001)
+        
+        # Heavy tasks only run every 4.0 seconds
+        if now - self.last_heavy_check >= 4.0:
+            self.last_heavy_check = now
+            self.cached_gpu = self.gpu_data()
+            
+            proc = []
+            for p in psutil.process_iter(["pid", "name", "username", "cpu_percent", "memory_percent", "status", "num_threads"]):
+                try:
+                    z = p.info
+                    z["cpu_percent"] = z.get("cpu_percent") or 0.0
+                    z["memory_percent"] = z.get("memory_percent") or 0.0
+                    proc.append(z)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess): pass
+            self.cached_proc = sorted(proc, key=lambda x: x["cpu_percent"], reverse=True)[:100]
+
         mi = self.meminfo()
         vm = psutil.virtual_memory()
         sw = psutil.swap_memory()
@@ -299,10 +344,6 @@ class HardwareMonitor:
         return {
             "type": "hardware",
             "timestamp": time.time(),
-            "network_ext": net_stats,
-            "peripherals": self.peripherals(),
-            "battery": self.batteries(),
-            "gpu": self.gpu_data(),
             "cpu": {
                 "global_percent": sum(cpu) / len(cpu) if cpu else 0,
                 "per_core_percent": cpu,
@@ -365,8 +406,10 @@ class HardwareMonitor:
             "filesystems": self.filesystems(),
             "sensors": self.sensors(),
             "battery": self.batteries(),
-            "gpu": self.gpu_data(),
-            "processes": proc
+            "gpu": self.cached_gpu,
+            "processes": self.cached_proc,
+            "peripherals": self.peripherals(),
+            "network_ext": net_stats
         }
         
 # --- Active Network Prober Engine ---
@@ -463,6 +506,10 @@ net_monitor = NetworkMonitor()
 
 async def broadcast_hardware():
     while True:
+        if not clients:
+            has_active_viewers.clear()
+            await has_active_viewers.wait() # Sleeps indefinitely (0% CPU)
+
         data = hw_monitor.collect()
         dead = set()
         for ws in list(clients):
@@ -497,14 +544,19 @@ app = FastAPI(lifespan=lifespan)
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    token = websocket.query_params.get("token", "")
+    if not hmac.compare_digest(token, AUTH_TOKEN):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await websocket.accept()
     clients.add(websocket)
+    has_active_viewers.set() # Wake up the collector loop
+
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        clients.discard(websocket)
-    except Exception:
         clients.discard(websocket)
 
 @app.get("/")
@@ -586,11 +638,11 @@ async def compute_device_status():
         "dns": dns_servers
     }
 
-@app.get("/api/device-status")
+@app.get("/api/device-status", dependencies=secure_api)
 async def get_device_status():
     return await compute_device_status()
 
-@app.post("/api/targets")
+@app.post("/api/targets", dependencies=secure_api)
 async def add_target(payload: TargetRequest):
     targets = net_monitor.load_targets()
     new_target = {
@@ -617,7 +669,7 @@ async def delete_target(target_id: str):
 
 # --- Diagnostics Streaming APIs (Traceroute & Discovery) ---
 
-@app.post("/api/traceroute")
+@app.post("/api/traceroute", dependencies=secure_api)
 async def run_traceroute(payload: dict):
     host = payload.get("host", "").strip()
     clean_host = re.sub(r"^https?://", "", host).split("/")[0].split(":")[0]
@@ -653,7 +705,7 @@ async def run_traceroute(payload: dict):
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
-@app.post("/api/discovery")
+@app.post("/api/discovery", dependencies=secure_api)
 async def run_discovery(payload: dict):
     subnet = payload.get("subnet", "").strip()
     
@@ -687,7 +739,7 @@ async def run_discovery(payload: dict):
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
-@app.post("/api/speedtest")
+@app.post("/api/speedtest", dependencies=secure_api)
 async def run_speedtest():
     async def stream():
         host = "speed.cloudflare.com"
