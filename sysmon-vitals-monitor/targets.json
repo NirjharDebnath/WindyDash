@@ -13,9 +13,15 @@
     "port": 53
   },
   {
-    "id": "c43860e0",
-    "name": "192.168.1.7",
-    "host": "192.168.1.7",
+    "id": "59787050",
+    "name": "ASUS-Vivobook",
+    "host": "192.168.1.200",
+    "method": "ping"
+  },
+  {
+    "id": "35ba8691",
+    "name": "microvm-firecracker",
+    "host": "172.16.0.2",
     "method": "ping"
   }
 ]
