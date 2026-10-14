@@ -23,7 +23,7 @@ SYSTEMD_DEST="/etc/systemd/system/${SERVICE_NAME}"
 print_banner() {
     echo -e "${C_AMBER}${C_BOLD}"
     echo "  ╔═════════════════════════════════════════════════════════════╗"
-    echo "  ║         WINDYDASH SERVICE & DEPLOYMENT CONTROLLER           ║"
+    echo "  ║         WINDYDASH - LINUX TELEMETRY SYSTEM DAEMON           ║"
     echo "  ╚═════════════════════════════════════════════════════════════╝"
     echo -e "${C_RESET}"
 }
