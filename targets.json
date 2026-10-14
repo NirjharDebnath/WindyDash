@@ -19,9 +19,21 @@
     "method": "ping"
   },
   {
-    "id": "35ba8691",
-    "name": "microvm-firecracker",
-    "host": "172.16.0.2",
+    "id": "6f27486c",
+    "name": "IQOO Neo 10R",
+    "host": "192.168.1.240",
+    "method": "ping"
+  },
+  {
+    "id": "099c1929",
+    "name": "YouTube",
+    "host": "youtube.com",
+    "method": "ping"
+  },
+  {
+    "id": "3a8cbdb0",
+    "name": "GitHub",
+    "host": "api.github.com",
     "method": "ping"
   }
 ]

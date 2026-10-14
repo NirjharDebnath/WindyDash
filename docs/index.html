@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WindyDash — Retro Industrial Telemetry & Network Console</title>
+  <meta name="description" content="A vintage-inspired Linux system monitor and active network diagnostic suite with sub-6ms polling and sleep-on-idle zero CPU waste.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <nav class="navbar">
+    <div class="container nav-inner">
+      <div class="brand-badge">
+        <div class="brand-icon">W</div>
+        <div class="brand-text">WindyDash <span style="font-size: 11px; color: var(--accent); font-weight: bold;">MK-II</span></div>
+      </div>
+      <div class="nav-links">
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#quickstart" class="nav-link">Quick Start</a>
+        <a href="#env-builder" class="nav-link">.env Builder</a>
+        <a href="#systemd" class="nav-link">Daemon Setup</a>
+        <a href="https://github.com/NirjharDebnath/WindyDash" target="_blank" rel="noopener" class="btn btn-primary">
+          <span>GitHub</span> ↗
+        </a>
+        <button id="themeToggleBtn" class="btn btn-icon" title="Toggle Vintage Theme">
+          <span id="themeIcon">☼</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero-tag">
+        <span class="pilot-bulb"></span>
+        <span>LABORATORY INSTRUMENTATION • SERIES 1984</span>
+      </div>
+      <h1>Retro Aesthetics.<br>Surgical Precision. Zero Bloat.</h1>
+      <p>
+        A lightweight Linux system telemetry monitor and active network diagnostic suite. 
+        Engineered with sub-6ms hardware collection, sleep-on-idle zero CPU waste, 
+        and authentic amber phosphor instrumentation.
+      </p>
+
+      <!-- Copiable Bash Quick-Install Hero Box -->
+      <div class="command-hero-box" id="quickstart">
+        <div class="command-bar">
+          <span>One-Line Terminal Setup & Deployment</span>
+          <span style="color: var(--accent2);">BASH / CURL</span>
+        </div>
+        <div class="command-content">
+          <code class="command-text" id="mainCmd">git clone https://github.com/NirjharDebnath/WindyDash.git && cd WindyDash && ./service.sh install</code>
+          <button class="btn btn-primary btn-copy" data-copy="git clone https://github.com/NirjharDebnath/WindyDash.git && cd WindyDash && ./service.sh install">
+            Copy Command
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Download Archive Buttons -->
+      <div class="hero-actions">
+        <a href="https://github.com/NirjharDebnath/WindyDash/archive/refs/heads/main.zip" class="btn">
+          <span>⬇ Download .ZIP</span>
+        </a>
+        <a href="https://github.com/NirjharDebnath/WindyDash/archive/refs/heads/main.tar.gz" class="btn">
+          <span>⬇ Download .TAR.GZ</span>
+        </a>
+        <a href="#env-builder" class="btn btn-primary">
+          <span>⚙ Configure .env File</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Feature Matrix Showcase -->
+    <section id="features">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">ENGINEERING SPECIFICATIONS</div>
+        <h2 class="section-title">Core Architecture & Capabilities</h2>
+        <p class="section-desc">Designed from the ground up for minimal resource footprints, complete Linux hardware visibility, and reliable network probing.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- 1. Sub-6ms Telemetry -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">⚡</div>
+          <h3>Sub-6ms Hardware Telemetry</h3>
+          <p>
+            Hot-path hardware collection completes in under 6 milliseconds. Process sampling is decoupled to 3.5s intervals, thread counts are read directly from <code>/proc/loadavg</code>, and sysfs paths are cached to eliminate redundant globbing.
+          </p>
+        </article>
+
+        <!-- 2. TingPing Network Prober -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">🌐</div>
+          <h3>TingPing Prober Engine</h3>
+          <p>
+            Concurrent, non-blocking network probe engine performing ICMP Ping, TCP handshake, and HTTP/HTTPS status tests with dynamic latency badges (<35ms fast, <100ms good, <250ms warn, down).
+          </p>
+        </article>
+
+        <!-- 3. Network Diagnostics Toolkit -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">🔍</div>
+          <h3>Live Diagnostics Suite</h3>
+          <p>
+            Interactive NDJSON streaming tools directly in the browser: live hop-by-hop Traceroute, CIDR Subnet Sweeper (up to /24), DNS Record Resolver (A, AAAA, CNAME, PTR), TCP Port Checker, and Cloudflare Speedtest.
+          </p>
+        </article>
+
+        <!-- 4. True Idle Sleep -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">💤</div>
+          <h3>Sleep-On-Idle Zero Waste</h3>
+          <p>
+            When no browser clients are viewing the dashboard, background hardware and network probing loops pause indefinitely with 0% CPU usage and zero outbound network queries.
+          </p>
+        </article>
+
+        <!-- 5. Self-Pruning Security -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">🛡</div>
+          <h3>Leak-Free Rate Limiter</h3>
+          <p>
+            Timing-attack safe token authentication via <code>hmac.compare_digest</code> paired with a sliding-window rate limiter that automatically garbage-collects idle client IPs to prevent memory leaks.
+          </p>
+        </article>
+
+        <!-- 6. Dual Vintage Theme -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">📻</div>
+          <h3>Dual Vintage Aesthetics</h3>
+          <p>
+            Switch seamlessly between <strong>Amber Phosphor CRT</strong> dark mode (with cathode vignette and glowing filament indicators) and <strong>Technical Parchment</strong> light mode (with Olivetti typewriter typography).
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Interactive .env Configuration Builder -->
+    <section id="env-builder">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">CONFIGURATION GENERATOR</div>
+        <h2 class="section-title">Interactive .env File Builder</h2>
+        <p class="section-desc">Customize your server host, port, polling interval, and authentication token. Copy the generated block directly into your project root.</p>
+      </div>
+
+      <div class="env-builder-grid">
+        <!-- Form Inputs -->
+        <div class="env-form">
+          <label>
+            Polling Interval (seconds)
+            <input type="number" id="inpInterval" value="1.0" step="0.5" min="0.5" max="10.0">
+            <small style="color:var(--muted); font-size:11px;">Frequency of telemetry broadcasts (1.0s recommended).</small>
+          </label>
+
+          <label>
+            Server Bind Address
+            <input type="text" id="inpHost" value="127.0.0.1">
+            <small style="color:var(--muted); font-size:11px;">Use <code>127.0.0.1</code> for local access, or <code>0.0.0.0</code> for LAN exposure.</small>
+          </label>
+
+          <label>
+            Dashboard Port Number
+            <input type="number" id="inpPort" value="4242" min="1025" max="65535">
+            <small style="color:var(--muted); font-size:11px;">Recommended: <code>4242</code>, <code>8765</code>, or <code>7654</code>.</small>
+          </label>
+
+          <label>
+            Dashboard Access Password
+            <input type="text" id="inpPassword" value="Nirjhar@06">
+            <small style="color:var(--muted); font-size:11px;">Passphrase required to access WebSockets and protected APIs.</small>
+          </label>
+
+          <label>
+            Anti-DDoS Rate Limit (req / 5s)
+            <input type="number" id="inpRate" value="25" min="5" max="100">
+            <small style="color:var(--muted); font-size:11px;">Sliding window request threshold per client IP.</small>
+          </label>
+        </div>
+
+        <!-- Generated Output Box -->
+        <div class="env-preview-box">
+          <div class="env-preview-header">
+            <span>Generated .env File</span>
+            <button class="btn btn-primary" id="btnCopyEnv" style="padding: 4px 10px; font-size: 11px;">Copy .env</button>
+          </div>
+          <pre class="env-code-output" id="envOutput"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Systemd Deployment & Service Guide -->
+    <section id="systemd">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">DEPLOYMENT CONTROLLER</div>
+        <h2 class="section-title">Automated Systemd Service Setup</h2>
+        <p class="section-desc">Use the included <code>service.sh</code> manager script to install, update, or reload WindyDash with a single command.</p>
+      </div>
+
+      <div class="guide-cards">
+        <!-- Step 1 -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">1</span>
+            <h4 class="step-title">Install & Register Background Service</h4>
+          </div>
+          <p style="color:var(--muted); font-size:12.5px; margin:0 0 10px;">
+            The manager script validates Python file syntax, auto-detects your virtualenv or Python binary, configures the service unit, and starts the daemon:
+          </p>
+          <div class="code-snippet">
+            <code>./service.sh install</code>
+            <button class="btn btn-primary" data-copy="./service.sh install" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">2</span>
+            <h4 class="step-title">Seamless Updates After Modifying Files</h4>
+          </div>
+          <p style="color:var(--muted); font-size:12.5px; margin:0 0 10px;">
+            Whenever you edit code or configuration, execute update. It runs pre-flight syntax checks to guarantee zero downtime before restarting:
+          </p>
+          <div class="code-snippet">
+            <code>./service.sh update</code>
+            <button class="btn btn-primary" data-copy="./service.sh update" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">3</span>
+            <h4 class="step-title">Monitor Status & Stream Real-time Journal Logs</h4>
+          </div>
+          <div class="code-snippet" style="margin-bottom: 8px;">
+            <code>./service.sh status     # Check live status & health</code>
+            <button class="btn btn-primary" data-copy="./service.sh status" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
+          <div class="code-snippet">
+            <code>./service.sh logs       # Stream real-time journal logs</code>
+            <button class="btn btn-primary" data-copy="./service.sh logs" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>
+        <strong>WindyDash MK-II</strong> • Built for Linux Telemetry Instrumentation
+      </div>
+      <div>
+        <a href="https://github.com/NirjharDebnath/WindyDash" target="_blank" rel="noopener">GitHub Repository</a> • 
+        <a href="#quickstart">Quick Install</a> • 
+        <a href="#env-builder">.env Guide</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

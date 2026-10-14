@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WindyDash — Retro Industrial Telemetry Console</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Top Application Bar -->
+  <header class="topbar">
+    <div class="topbar-brand-area">
+      <div class="eyebrow">LABORATORY TELEMETRY INSTRUMENTATION • MODEL 1984</div>
+      <div class="brand">
+        <div class="brand-logo">W</div>
+        <h1>WindyDash</h1>
+        <span class="version-tag">MK-II</span>
+      </div>
+      <div class="subtitle" id="hostInfo">Connecting to telemetry daemon…</div>
+    </div>
+    <div class="top-actions">
+      <div class="pulse-container">
+        <span id="daemonStatus" class="status disconnected">
+          <span class="status-dot"></span>
+          <span id="daemonStatusText">Offline</span>
+        </span>
+      </div>
+      <button id="themeToggle" class="icon-btn" title="Toggle dark/light theme">
+        <span id="themeIcon">☼</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sticky Navigation Tabs -->
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview"><span class="tab-icon">⌘</span> Overview</button>
+    <button class="tab" data-tab="processor"><span class="tab-icon">⚡</span> Processor</button>
+    <button class="tab" data-tab="memory"><span class="tab-icon">▥</span> Memory</button>
+    <button class="tab" data-tab="system"><span class="tab-icon">⚙</span> System</button>
+    <button class="tab" data-tab="network"><span class="tab-icon">🌐</span> Network</button>
+    <button class="tab" data-tab="diagnostics"><span class="tab-icon">🔍</span> Diagnostics</button>
+    <button class="tab" data-tab="storage"><span class="tab-icon">💾</span> Storage</button>
+    <button class="tab" data-tab="sensors"><span class="tab-icon">🌡</span> Sensors</button>
+    <button class="tab" data-tab="gpu"><span class="tab-icon">🎮</span> GPU</button>
+    <button class="tab" data-tab="battery"><span class="tab-icon">🔋</span> Battery</button>
+    <button class="tab" data-tab="processes"><span class="tab-icon">📋</span> Processes</button>
+    <button class="tab" data-tab="peripherals"><span class="tab-icon">🔌</span> Peripherals</button>
+  </nav>
+
+  <main>
+    <!-- 1. Overview Tab -->
+    <section class="tab-panel active" id="overview">
+      <div class="hero-grid">
+        <article class="metric-card">
+          <div class="metric-header"><span>CPU USAGE</span><span class="metric-mini-badge">Core</span></div>
+          <strong id="ovCpu">—</strong>
+          <small id="ovCpuFreq">—</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-header"><span>MEMORY</span><span class="metric-mini-badge">RAM</span></div>
+          <strong id="ovMem">—</strong>
+          <small id="ovMemDetail">—</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-header"><span>LOAD AVERAGE</span><span class="metric-mini-badge">1m</span></div>
+          <strong id="ovLoad">—</strong>
+          <small id="ovUptime">—</small>
+        </article>
+        <article class="metric-card">
+          <div class="metric-header"><span>NETWORK I/O</span><span class="metric-mini-badge">Live</span></div>
+          <strong id="ovNet">—</strong>
+          <small id="ovNetDetail">—</small>
+        </article>
+      </div>
+
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>CPU Utilization History</h2><p>Processor workload over the last 60 polling intervals.</p></div>
+            <span class="live-pill">Live</span>
+          </div>
+          <div class="chart-wrap"><canvas id="overviewCpuChart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Memory Usage History</h2><p>RAM consumption and saturation dynamics over time.</p></div>
+            <span class="live-pill">Live</span>
+          </div>
+          <div class="chart-wrap"><canvas id="overviewMemChart"></canvas></div>
+        </article>
+      </div>
+
+      <div class="grid three overview-insights">
+        <article class="panel insight-card">
+          <div class="section-heading">
+            <div><h3>Host Snapshot</h3><p>Identity, kernel, and operating environment.</p></div>
+            <span class="section-icon">⌘</span>
+          </div>
+          <div id="quickSystem" class="kv"></div>
+        </article>
+        <article class="panel insight-card">
+          <div class="section-heading">
+            <div><h3>Top Processes</h3><p>Tasks demanding the most compute capacity right now.</p></div>
+            <span class="section-icon">⚡</span>
+          </div>
+          <div id="topProcess" class="process-highlight">—</div>
+        </article>
+        <article class="panel insight-card">
+          <div class="section-heading">
+            <div><h3>Hot Thermals</h3><p>Highest temperature readings across all sensors.</p></div>
+            <span class="section-icon">°</span>
+          </div>
+          <div id="hotSensors" class="sensor-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 2. Processor Tab -->
+    <section class="tab-panel" id="processor">
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Per-Core Utilization</h2><p>Dynamic distribution of execution threads across all cores.</p></div>
+            <span id="coreCount" class="badge">—</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="coreChart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Core Frequencies</h2><p>Instantaneous CPU clock rates reported in megahertz.</p></div>
+            <span class="badge">MHz</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="freqChart"></canvas></div>
+        </article>
+      </div>
+      <div class="stats-grid" id="processorStats"></div>
+    </section>
+
+    <!-- 3. Memory Tab -->
+    <section class="tab-panel" id="memory">
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Memory Allocation</h2><p>Physical RAM division: Used, Available, Buffers & Cache.</p></div>
+            <span id="memPercent" class="badge">—</span>
+          </div>
+          <div class="chart-wrap"><canvas id="memoryChart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Swap Space Utilization</h2><p>Paging activity when physical memory thresholds are reached.</p></div>
+            <span class="live-pill">Live</span>
+          </div>
+          <div class="chart-wrap"><canvas id="swapChart"></canvas></div>
+        </article>
+      </div>
+      <div class="stats-grid" id="memoryStats"></div>
+    </section>
+
+    <!-- 4. System Tab -->
+    <section class="tab-panel" id="system">
+      <div class="stats-grid" id="systemStats"></div>
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Load Averages</h2><p>Run queue length tracked across 1, 5, and 15-minute windows.</p></div>
+            <span class="badge">1 / 5 / 15 min</span>
+          </div>
+          <div class="chart-wrap"><canvas id="loadChart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Operating Runtime</h2><p>Kernel specifications, system architecture, and runtime stats.</p></div>
+          </div>
+          <div id="systemInfo" class="kv"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 5. Network Tab -->
+    <section class="tab-panel" id="network">
+      <article class="panel compact" style="margin-bottom: 16px;">
+        <div class="panel-title">
+          <div><h2>Host Network Snapshot</h2><p>Gateway, DNS, interfaces, and public IP resolution.</p></div>
+        </div>
+        <div class="stats-grid" id="deviceStatusGrid">
+          <div class="empty">Loading network topology...</div>
+        </div>
+      </article>
+
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Throughput History</h2><p>Live aggregate inbound and outbound data transmission rates.</p></div>
+            <span class="badge">bytes/s</span>
+          </div>
+          <div class="chart-wrap"><canvas id="networkChart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Network Interfaces</h2><p>Link operational state, MTU, IP addresses, and transfer counters.</p></div>
+            <span class="badge">Live</span>
+          </div>
+          <div id="interfaces" class="interface-list"></div>
+        </article>
+      </div>
+
+      <article class="panel" style="margin-top: 16px;">
+        <div class="panel-title">
+          <div>
+            <h2>Active Monitored Services</h2>
+            <p>High-frequency non-blocking probes (ICMP Ping, TCP Handshake, HTTP Status).</p>
+          </div>
+          <div class="header-actions">
+            <button id="btnRecheckAll" class="action-btn-secondary" title="Recheck all targets immediately">↻ Recheck Now</button>
+            <button id="openTargetModalBtn" class="action-btn-primary">+ Add Target</button>
+          </div>
+        </div>
+        <div class="grid three" id="targetGrid">
+          <div class="empty">Waiting for network telemetry...</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- 6. Diagnostics Tab (Enhanced with DNS Resolver & TCP Port Checker) -->
+    <section class="tab-panel" id="diagnostics">
+      <div class="page-intro">
+        <div>
+          <div class="eyebrow">NETWORK DIAGNOSTICS & BENCHMARKING</div>
+          <h2>Interactive Connectivity Suite</h2>
+          <p>Execute live streaming network probes, traceroutes, DNS lookups, and bandwidth benchmarks directly from the browser.</p>
+        </div>
+      </div>
+
+      <div class="diagnostic-grid">
+        <!-- Card 1: Live Traceroute -->
+        <article class="panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon">↗</div>
+            <div><h3>Live Traceroute</h3><p>Follow the hop-by-hop route to identify where latency spikes or packet loss occur.</p></div>
+          </div>
+          <div class="diag-form">
+            <input type="text" id="traceHost" placeholder="1.1.1.1 or google.com" class="diag-input">
+            <button id="btnTrace" class="action-btn">Trace Route</button>
+          </div>
+          <div class="diag-result">
+            <div class="result-label"><span>Trace Output</span><span class="result-state" id="traceState">Ready</span></div>
+            <pre id="traceOutput" class="diagnostic-output">Ready for input.</pre>
+          </div>
+        </article>
+
+        <!-- Card 2: CIDR Subnet Discovery -->
+        <article class="panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon">⌁</div>
+            <div><h3>Subnet Ping Sweep</h3><p>Scan a local IPv4 CIDR block (up to 256 hosts) for responding network devices.</p></div>
+          </div>
+          <div class="diag-form">
+            <input type="text" id="discoverySubnet" placeholder="192.168.1.0/24" class="diag-input">
+            <button id="btnDiscovery" class="action-btn">Scan Subnet</button>
+          </div>
+          <div class="diag-result">
+            <div class="result-label"><span>Discovery Output</span><span class="result-state" id="discoveryState">Ready</span></div>
+            <pre id="discoveryOutput" class="diagnostic-output">Ready for sweep.</pre>
+          </div>
+        </article>
+
+        <!-- Card 3: DNS Record Resolver (NEW) -->
+        <article class="panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon">🖹</div>
+            <div><h3>DNS Record Resolver</h3><p>Look up A (IPv4), AAAA (IPv6), Canonical Names (CNAME), and Reverse PTR records.</p></div>
+          </div>
+          <div class="diag-form">
+            <input type="text" id="dnsDomain" placeholder="e.g. cloudflare.com or 8.8.8.8" class="diag-input">
+            <button id="btnDns" class="action-btn">Resolve DNS</button>
+          </div>
+          <div class="diag-result">
+            <div class="result-label"><span>Resolved Records</span><span class="result-state" id="dnsState">Ready</span></div>
+            <pre id="dnsOutput" class="diagnostic-output">Enter domain or IP to query DNS.</pre>
+          </div>
+        </article>
+
+        <!-- Card 4: TCP Port Reachability Checker (NEW) -->
+        <article class="panel diagnostic-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon">🚪</div>
+            <div><h3>TCP Port Checker</h3><p>Test if an arbitrary port (SSH, Web, Database) is open, filtered, or unreachable.</p></div>
+          </div>
+          <div class="diag-form">
+            <input type="text" id="portHost" placeholder="Target Host or IP" class="diag-input" style="flex: 2;">
+            <input type="number" id="portNum" placeholder="Port (e.g. 443)" class="diag-input" style="flex: 1;" min="1" max="65535">
+            <button id="btnPortCheck" class="action-btn">Test Port</button>
+          </div>
+          <div class="diag-result">
+            <div class="result-label"><span>Port Result</span><span class="result-state" id="portState">Ready</span></div>
+            <pre id="portOutput" class="diagnostic-output">Specify host and port to probe.</pre>
+          </div>
+        </article>
+
+        <!-- Card 5: Bandwidth Benchmark -->
+        <article class="panel diagnostic-card speedtest-card">
+          <div class="diagnostic-header">
+            <div class="diagnostic-icon">↕</div>
+            <div><h3>Bandwidth & Latency Benchmark</h3><p>Accurate Cloudflare Edge throughput test with real-time download and upload rate meters.</p></div>
+          </div>
+          <button id="btnSpeedtest" class="action-btn primary-action">Start Speed Test</button>
+          <div class="benchmark-grid">
+            <div class="benchmark-stat"><span>Latency (TCP)</span><strong id="stPing">—</strong><small>Round-trip</small></div>
+            <div class="benchmark-stat"><span>Download Throughput</span><strong id="stDown">—</strong><small>Receive Rate</small></div>
+            <div class="benchmark-stat"><span>Upload Throughput</span><strong id="stUp">—</strong><small>Transmit Rate</small></div>
+          </div>
+          <div class="diag-result">
+            <div class="result-label"><span>Benchmark Telemetry</span><span class="result-state" id="speedState">Ready</span></div>
+            <pre id="speedtestOutput" class="diagnostic-output speedtest-output">Ready to benchmark throughput.</pre>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 7. Storage Tab (Enhanced with Visual Progress Bars) -->
+    <section class="tab-panel" id="storage">
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Disk I/O Throughput</h2><p>Storage controller read and write bandwidth over time.</p></div>
+            <span class="badge">bytes/s</span>
+          </div>
+          <div class="chart-wrap"><canvas id="diskChart"></canvas></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Mounted Filesystems</h2><p>Storage partitions, mountpoints, and allocated capacity.</p></div>
+          </div>
+          <div id="filesystems" class="disk-list"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 8. Sensors Tab -->
+    <section class="tab-panel" id="sensors">
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title"><div><h2>Temperature Sensors</h2><p>Thermal readings exposed by hwmon chips.</p></div><span class="badge">°C</span></div>
+          <div id="temperatures" class="sensor-list large"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><div><h2>Cooling Fans</h2><p>Current rotational fan speeds in RPM.</p></div><span class="badge">RPM</span></div>
+          <div id="fans" class="sensor-list large"></div>
+        </article>
+      </div>
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title"><div><h2>Voltage Levels</h2><p>Electrical potential across internal rails.</p></div><span class="badge">V</span></div>
+          <div id="voltages" class="sensor-list large"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-title"><div><h2>Other Sensors</h2><p>Auxiliary power and current telemetry.</p></div></div>
+          <div id="otherSensors" class="sensor-list large"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 9. GPU Tab -->
+    <section class="tab-panel" id="gpu">
+      <div id="gpuContent"></div>
+    </section>
+
+    <!-- 10. Battery Tab -->
+    <section class="tab-panel" id="battery">
+      <div id="batteryContent"></div>
+    </section>
+
+    <!-- 11. Processes Tab (Enhanced with Real-time Filter) -->
+    <section class="tab-panel" id="processes">
+      <article class="panel">
+        <div class="panel-title">
+          <div><h2>Process Monitor</h2><p>Live resource consumption across running processes.</p></div>
+          <span id="processCount" class="badge">—</span>
+        </div>
+        <div class="proc-toolbar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="procSearch" placeholder="Filter processes by name, PID, or user..." class="proc-search-input">
+          </div>
+          <button id="clearProcSearch" class="action-btn-secondary" style="display: none;">Clear</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>PID</th>
+                <th>USER</th>
+                <th>COMMAND</th>
+                <th>CPU %</th>
+                <th>MEM %</th>
+                <th>THREADS</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="processTable"></tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+
+    <!-- 12. Peripherals Tab (Displays, USB & Thunderbolt) -->
+    <section class="tab-panel" id="peripherals">
+      <div class="grid two">
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>Connected Displays</h2><p>Physical monitors, resolutions, and refresh modes via DRM.</p></div>
+            <span class="badge">DRM / KMS</span>
+          </div>
+          <div id="displayList" class="sensor-list large">
+            <div class="empty">Scanning for video displays...</div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <div><h2>USB & Thunderbolt Peripherals</h2><p>Connected bus controllers, input devices, and hubs.</p></div>
+            <span class="badge">Bus Devices</span>
+          </div>
+          <div id="usbList" class="sensor-list large">
+            <div class="empty">Scanning USB controllers...</div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>WindyDash v2.0 • Unified Linux Telemetry & Prober Daemon</span>
+      <span id="lastUpdate">Awaiting connection…</span>
+    </div>
+  </footer>
+
+  <!-- Target Configuration Modal -->
+  <dialog id="targetModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Add Network Monitor</h3>
+        <button id="closeTargetModalBtn" class="close-modal-x">&times;</button>
+      </div>
+      <form id="targetForm">
+        <label>Display Name (Optional)
+          <input type="text" id="tName" placeholder="e.g. Core Router Gateway">
+        </label>
+        <label>Host / IP Address
+          <input type="text" id="tHost" required placeholder="e.g. 192.168.1.1 or api.github.com">
+        </label>
+        <label>Probe Protocol
+          <select id="tMethod">
+            <option value="ping">Ping (ICMP Echo)</option>
+            <option value="tcp">TCP Handshake</option>
+            <option value="http">HTTP / HTTPS Status</option>
+          </select>
+        </label>
+        <label id="tPortContainer" style="display: none;">Port
+          <input type="number" id="tPort" placeholder="e.g. 22, 53, 443" min="1" max="65535">
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="cancelTargetModalBtn" class="btn-cancel">Cancel</button>
+          <button type="submit" class="btn-submit">Add Monitor</button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

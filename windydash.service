@@ -1,0 +1,24 @@
+[Unit]
+Description=WindyDash Retro Telemetry Daemon & Web Dashboard
+Documentation=file:/home/nirjhar/Python Codes/Einstein/WindyDash/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nirjhar
+WorkingDirectory=/home/nirjhar/Python Codes/Einstein/WindyDash
+ExecStart="/home/nirjhar/Python Codes/Einstein/einsteinenv/bin/python" sysmon.py
+Restart=always
+RestartSec=3
+
+# Safe environment loading
+EnvironmentFile=-/home/nirjhar/Python Codes/Einstein/WindyDash/.env
+
+# Clean shutdown
+KillSignal=SIGTERM
+TimeoutStopSec=10
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
