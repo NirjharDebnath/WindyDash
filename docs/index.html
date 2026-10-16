@@ -13,13 +13,14 @@
   <nav class="navbar">
     <div class="container nav-inner">
       <div class="brand-badge">
-        <div class="brand-icon">W</div>
+        <div class="brand-icon">🍁</div>
         <div class="brand-text">WindyDash <span style="font-size: 11px; color: var(--accent); font-weight: bold;">MK-II</span></div>
       </div>
       <div class="nav-links">
         <a href="#features" class="nav-link">Features</a>
         <a href="#quickstart" class="nav-link">Quick Start</a>
         <a href="#env-builder" class="nav-link">.env Builder</a>
+        <a href="#operators" class="nav-link">Operators</a>
         <a href="#systemd" class="nav-link">Daemon Setup</a>
         <a href="https://github.com/NirjharDebnath/WindyDash" target="_blank" rel="noopener" class="btn btn-primary">
           <span>GitHub</span> ↗
@@ -36,9 +37,9 @@
     <div class="container">
       <div class="hero-tag">
         <span class="pilot-bulb"></span>
-        <span>LABORATORY INSTRUMENTATION • SERIES 1984</span>
+        <span>LABORATORY INSTRUMENTATION • WindyDash 2026</span>
       </div>
-      <h1>Retro Aesthetics.<br>Surgical Precision. Zero Bloat.</h1>
+      <h1>Low Latency.<br>Hardware Precision. Zero Bloat.</h1>
       <p>
         A lightweight Linux system telemetry monitor and active network diagnostic suite. 
         Engineered with sub-6ms hardware collection, sleep-on-idle zero CPU waste, 
@@ -121,16 +122,25 @@
           </p>
         </article>
 
-        <!-- 5. Self-Pruning Security -->
+        <!-- 5. SQLite Credential Vault -->
         <article class="feature-card">
-          <div class="feature-icon-badge">🛡</div>
-          <h3>Leak-Free Rate Limiter</h3>
+          <div class="feature-icon-badge">🔒</div>
+          <h3>SQLite Credential Vault</h3>
           <p>
-            Timing-attack safe token authentication via <code>hmac.compare_digest</code> paired with a sliding-window rate limiter that automatically garbage-collects idle client IPs to prevent memory leaks.
+            Zero-dependency authentication vault powered by standard library <code>sqlite3</code> and memory-hard <code>scrypt</code> password hashing. Session tokens, strict <code>0600</code> Linux file permissions, and zero clunky browser popups.
           </p>
         </article>
 
-        <!-- 6. Dual Vintage Theme -->
+        <!-- 6. lscpu Processor Topology -->
+        <article class="feature-card">
+          <div class="feature-icon-badge">⚙</div>
+          <h3>lscpu Processor Topology</h3>
+          <p>
+            Probes deep CPU silicon details on startup: architecture, silicon stepping, L1/L2/L3 SRAM cache hierarchy, hardware virtualization (AMD-V / VT-x), and vulnerability mitigations with zero polling overhead.
+          </p>
+        </article>
+
+        <!-- 7. Dual Vintage Theme -->
         <article class="feature-card">
           <div class="feature-icon-badge">📻</div>
           <h3>Dual Vintage Aesthetics</h3>
@@ -171,9 +181,9 @@
           </label>
 
           <label>
-            Dashboard Access Password
-            <input type="text" id="inpPassword" value="SecretPassword">
-            <small style="color:var(--muted); font-size:11px;">Passphrase required to access WebSockets and protected APIs.</small>
+            Legacy Master Passcode (Optional)
+            <input type="text" id="inpPassword" value="" placeholder="Leave blank (SQLite Vault is default)">
+            <small style="color:var(--muted); font-size:11px;">Optional. Operator accounts are managed directly in the local SQLite vault.</small>
           </label>
 
           <label>
@@ -190,6 +200,76 @@
             <button class="btn btn-primary" id="btnCopyEnv" style="padding: 4px 10px; font-size: 11px;">Copy .env</button>
           </div>
           <pre class="env-code-output" id="envOutput"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Operator Accounts & Security Vault Section -->
+    <section id="operators">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">CREDENTIAL VAULT & AUTHENTICATION</div>
+        <h2 class="section-title">Operator Accounts & Terminal Gateway</h2>
+        <p class="section-desc">Zero-dependency SQLite credential management with memory-hard scrypt hashing and constant-time verification. Manage operators via web interface or headless terminal commands.</p>
+      </div>
+
+      <div class="guide-cards">
+        <!-- Step 1: Default Admin & First-Time Setup -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">1</span>
+            <h4 class="step-title">Initial Operator Boot & Web Setup Wizard</h4>
+          </div>
+          <p style="color:var(--muted); font-size:12.5px; margin:0 0 10px;">
+            On first boot with an empty database, WindyDash automatically surfaces the <strong>First-Time Setup Wizard</strong> to initialize your master administrator credentials. If a legacy <code>DASH_PASSWORD</code> is detected in <code>.env</code>, an <code>admin</code> operator is pre-initialized.
+          </p>
+          <div class="code-snippet">
+            <code>Default Operator: "admin" (or initialized via Web Setup Wizard)</code>
+          </div>
+        </div>
+
+        <!-- Step 2: View Registered Operators -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">2</span>
+            <h4 class="step-title">List All Registered Operators</h4>
+          </div>
+          <p style="color:var(--muted); font-size:12.5px; margin:0 0 10px;">
+            Query the local SQLite vault directly from your Linux shell to view all authorized telemetry console operators:
+          </p>
+          <div class="code-snippet">
+            <code>python3 sysmon.py --listusers</code>
+            <button class="btn btn-primary" data-copy="python3 sysmon.py --listusers" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Register New Operator -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">3</span>
+            <h4 class="step-title">Register a New Operator Account</h4>
+          </div>
+          <p style="color:var(--muted); font-size:12.5px; margin:0 0 10px;">
+            Add a new operator with an interactive, masked password prompt. Credentials are automatically salted and hashed using memory-hard scrypt:
+          </p>
+          <div class="code-snippet">
+            <code>python3 sysmon.py --adduser &lt;operator&gt;</code>
+            <button class="btn btn-primary" data-copy="python3 sysmon.py --adduser operator" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Change Password -->
+        <div class="guide-step">
+          <div class="step-header">
+            <span class="step-number">4</span>
+            <h4 class="step-title">Update an Existing Operator's Passcode</h4>
+          </div>
+          <p style="color:var(--muted); font-size:12.5px; margin:0 0 10px;">
+            Reset or rotate credentials for any operator without restarting the background service:
+          </p>
+          <div class="code-snippet">
+            <code>python3 sysmon.py --passwd &lt;operator&gt;</code>
+            <button class="btn btn-primary" data-copy="python3 sysmon.py --passwd operator" style="padding: 4px 8px; font-size: 10px;">Copy</button>
+          </div>
         </div>
       </div>
     </section>

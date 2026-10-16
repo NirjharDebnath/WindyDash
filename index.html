@@ -20,6 +20,13 @@
       <div class="subtitle" id="hostInfo">Connecting to telemetry daemon…</div>
     </div>
     <div class="top-actions">
+      <div id="userBadgeArea" class="user-badge-area" style="display:none;">
+        <span class="operator-pill">
+          <span class="operator-lamp"></span>
+          <span id="operatorName">OPERATOR</span>
+        </span>
+        <button id="logoutBtn" class="vintage-btn tiny-btn" title="Sign Out">LOGOUT</button>
+      </div>
       <div class="pulse-container">
         <span id="daemonStatus" class="status disconnected">
           <span class="status-dot"></span>
@@ -118,6 +125,23 @@
 
     <!-- 2. Processor Tab -->
     <section class="tab-panel" id="processor">
+      <!-- CPU Hero Header Card -->
+      <article class="panel cpu-hero-panel">
+        <div class="cpu-hero-header">
+          <div class="cpu-icon-chip">⚡</div>
+          <div class="cpu-hero-info">
+            <h2 id="cpuFullModel">Detecting Processor...</h2>
+            <div class="cpu-hero-subtags" id="cpuHeroTags">
+              <span class="cpu-tag" id="cpuTagArch">—</span>
+              <span class="cpu-tag" id="cpuTagTopology">—</span>
+              <span class="cpu-tag" id="cpuTagBoost">—</span>
+              <span class="cpu-tag" id="cpuTagL3">—</span>
+              <span class="cpu-tag tag-success" id="cpuTagVirt">—</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
       <div class="grid two">
         <article class="panel">
           <div class="panel-title">
@@ -135,6 +159,33 @@
         </article>
       </div>
       <div class="stats-grid" id="processorStats"></div>
+
+      <!-- lscpu Detailed Specifications Grid -->
+      <div class="grid three cpu-details-grid">
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Microarchitecture & Topology</h3><p>Silicon layout, stepping, and execution pipeline.</p></div>
+            <span class="section-icon">⚙</span>
+          </div>
+          <div class="kv" id="cpuTopologyStats"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Cache Hierarchy & Clocking</h3><p>Multi-level SRAM cache and clock scaling.</p></div>
+            <span class="section-icon">▥</span>
+          </div>
+          <div class="kv" id="cpuCacheStats"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Instruction Sets & Security</h3><p>Hardware virtualization and silicon mitigations.</p></div>
+            <span class="section-icon">🔒</span>
+          </div>
+          <div class="kv" id="cpuExtStats"></div>
+        </article>
+      </div>
     </section>
 
     <!-- 3. Memory Tab -->
@@ -469,6 +520,64 @@
       </form>
     </div>
   </dialog>
+
+  <!-- Vintage CRT Access Terminal Modal -->
+  <div id="authOverlay" class="auth-overlay" style="display:none;">
+    <div class="auth-modal" id="authModalCard">
+      <div class="terminal-bezel">
+        <div class="terminal-header">
+          <div class="terminal-lamps">
+            <span class="lamp lamp-red" id="authLampRed"></span>
+            <span class="lamp lamp-amber" id="authLampAmber"></span>
+            <span class="lamp lamp-green" id="authLampGreen"></span>
+          </div>
+          <span class="terminal-title" id="authModalTitle">SECURITY TERMINAL // ACCESS GATEWAY</span>
+          <span class="terminal-badge" id="authModeBadge">AUTHENTICATION REQUIRED</span>
+        </div>
+        <div class="terminal-screen">
+          <div class="terminal-banner">
+            <pre class="terminal-ascii">
+╦ ╦╦╔╗╔╔╦╗╦ ╦╔╦╗╔═╗╔═╗╦ ╦
+║║║║║║║ ║║╚╦╝ ║║╠═╣╚═╗╠═╣
+╚╩╝╩╝╚╝═╩╝ ╩ ═╩╝╩ ╩╚═╝╩ ╩</pre>
+            <div class="terminal-prompt" id="authSubtitle">INITIALIZING OPERATOR SECURITY HANDSHAKE...</div>
+          </div>
+
+          <div id="authAlert" class="auth-alert" style="display:none;"></div>
+
+          <form id="authForm" class="auth-form" autocomplete="off">
+            <div class="auth-field">
+              <label for="authUsername">OPERATOR USERNAME</label>
+              <div class="input-glow-wrap">
+                <span class="prompt-arrow">&gt;</span>
+                <input type="text" id="authUsername" placeholder="e.g. admin" required autofocus autocomplete="username" spellcheck="false">
+              </div>
+            </div>
+
+            <div class="auth-field">
+              <label for="authPassword">ACCESS PASSCODE</label>
+              <div class="input-glow-wrap">
+                <span class="prompt-arrow">&gt;</span>
+                <input type="password" id="authPassword" placeholder="••••••••••••" required autocomplete="current-password">
+              </div>
+            </div>
+
+            <div class="auth-actions">
+              <button type="submit" id="authSubmitBtn" class="vintage-btn auth-submit-btn">
+                <span class="btn-indicator"></span>
+                <span id="authSubmitText">LOG IN OPERATOR</span>
+              </button>
+            </div>
+          </form>
+
+          <div class="terminal-footer">
+            <span>TERMINAL ID: WD-SYS-VAULT</span>
+            <span id="authVaultNote">SQLITE MEMORY-HARD SCRYPT ENCRYPTION</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

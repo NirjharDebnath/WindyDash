@@ -11,11 +11,9 @@
  */
 
 // --- Authentication & Handshake ---
-let authToken = sessionStorage.getItem("dash_token");
-if (!authToken) {
-    authToken = prompt("Enter WindyDash Password (leave blank if none configured):") || "";
-    sessionStorage.setItem("dash_token", authToken);
-}
+let authToken = localStorage.getItem("dash_token") || sessionStorage.getItem("dash_token") || "";
+let currentOperator = localStorage.getItem("dash_operator") || sessionStorage.getItem("dash_operator") || "";
+let isSetupMode = false;
 
 const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
 const host = window.location.host || "127.0.0.1:4040";
@@ -354,13 +352,73 @@ function updateHardware(d) {
             .map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
     }
 
+    // CPU Hero Banner & Badges
+    const cpuDet = c.details || {};
+    if ($("cpuFullModel")) {
+        $("cpuFullModel").textContent = cpuDet.model_name || c.model || "Generic Processor";
+    }
+    if ($("cpuTagArch")) $("cpuTagArch").textContent = cpuDet.architecture || "x86_64";
+    if ($("cpuTagTopology")) $("cpuTagTopology").textContent = `${c.physical_cores || cpuDet.cores_per_socket || 1} Cores / ${c.logical_cores || cpuDet.total_cpus || 1} Threads`;
+    if ($("cpuTagBoost")) $("cpuTagBoost").textContent = `Max: ${cpuDet.freq_max || "N/A"}`;
+    if ($("cpuTagL3")) $("cpuTagL3").textContent = `L3: ${cpuDet.l3 || "N/A"}`;
+    if ($("cpuTagVirt")) {
+        $("cpuTagVirt").textContent = cpuDet.virtualization && cpuDet.virtualization !== "None" ? `${cpuDet.virtualization} Active` : "Virt: None";
+    }
+
+    // Live Processor Performance Strip
     stats("processorStats", [
-        ["Physical cores", c.physical_cores],
-        ["Logical cores", c.logical_cores],
-        ["Current frequency", `${(c.freq_current_mhz || 0).toFixed(0)} MHz`],
-        ["Context switches", c.ctx_switches]
+        ["Physical cores", c.physical_cores || cpuDet.cores_per_socket],
+        ["Logical threads", c.logical_cores || cpuDet.total_cpus],
+        ["Average clock", `${(c.freq_current_mhz || 0).toFixed(0)} MHz`],
+        ["Load status", `${fmtPct(c.global_percent)} load`],
+        ["Context switches", (c.ctx_switches || 0).toLocaleString()]
     ]);
     if ($("coreCount")) $("coreCount").textContent = `${c.logical_cores || 0} logical cores`;
+
+    // 1. Microarchitecture & Topology
+    if ($("cpuTopologyStats")) {
+        const steppingStr = [
+            cpuDet.family ? `Family ${cpuDet.family}` : "",
+            cpuDet.model ? `Model ${cpuDet.model}` : "",
+            cpuDet.stepping ? `Step ${cpuDet.stepping}` : ""
+        ].filter(Boolean).join(", ") || "Standard";
+
+        $("cpuTopologyStats").innerHTML = [
+            ["Vendor ID", cpuDet.vendor_id || "Unknown"],
+            ["Architecture", `${cpuDet.architecture || "x86_64"} (${cpuDet.op_modes || "64-bit"})`],
+            ["Silicon stepping", steppingStr],
+            ["Physical sockets", `${cpuDet.sockets || 1} Socket`],
+            ["Cores per socket", `${cpuDet.cores_per_socket || c.physical_cores || 1} Cores`],
+            ["Threads per core", `${cpuDet.threads_per_core || 1} ${Number(cpuDet.threads_per_core) > 1 ? '(SMT / HT)' : ''}`],
+            ["Address bus", cpuDet.address_sizes || "48-bit phys / 48-bit virt"],
+            ["Byte order", cpuDet.byte_order || "Little Endian"]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // 2. Cache Hierarchy & Clocking
+    if ($("cpuCacheStats")) {
+        $("cpuCacheStats").innerHTML = [
+            ["L1 Data Cache", cpuDet.l1d || "N/A"],
+            ["L1 Instruction", cpuDet.l1i || "N/A"],
+            ["L2 Unified Cache", cpuDet.l2 || "N/A"],
+            ["L3 Shared Cache", cpuDet.l3 || "N/A"],
+            ["Base / Min clock", cpuDet.freq_min || "N/A"],
+            ["Peak / Max clock", cpuDet.freq_max || "N/A"],
+            ["Frequency boost", cpuDet.freq_boost || "Enabled"],
+            ["BogoMIPS", cpuDet.bogomips || "N/A"]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // 3. Instruction Sets & Security
+    if ($("cpuExtStats")) {
+        const flagPills = (cpuDet.key_flags || []).map(f => `<span class="flag-pill">${esc(f)}</span>`).join("");
+        $("cpuExtStats").innerHTML = [
+            ["Virtualization", `<span style="color:var(--accent2); font-weight:700;">${esc(cpuDet.virtualization || "None")}</span>`],
+            ["Key extensions", `<div class="flag-pills">${flagPills || "Standard"}</div>`],
+            ["Vulnerabilities", esc(cpuDet.vuln_summary || "Protected")],
+            ["NUMA nodes", `${cpuDet.numa_nodes || 1} Node(s)`]
+        ].map(x => `<div>${esc(x[0])}</div><div>${x[1]}</div>`).join("");
+    }
 
     stats("memoryStats", [
         ["Total", fmtBytes(m.total)],
@@ -434,7 +492,7 @@ function updateNetworkTargets(d) {
     const grid = $("targetGrid");
     if (!grid) return;
     if (!d.results || d.results.length === 0) {
-        grid.innerHTML = '<div class="empty">No targets configured in targets.json</div>';
+        grid.innerHTML = '<div class="empty">No probe targets configured in SQLite vault.</div>';
         return;
     }
     grid.innerHTML = d.results.map(t => {
@@ -604,12 +662,10 @@ function connect() {
         if ($("daemonStatusText")) $("daemonStatusText").textContent = "Sleeping";
 
         if (e.code === 1008) {
+            localStorage.removeItem("dash_token");
             sessionStorage.removeItem("dash_token");
-            authToken = prompt("Incorrect password. Please enter WindyDash Password:");
-            if (authToken !== null) {
-                sessionStorage.setItem("dash_token", authToken);
-                connect();
-            }
+            authToken = "";
+            showAuthModal(false, "Session rejected or expired. Please authenticate.");
             return;
         }
         retryTimer = setTimeout(connect, 3000);
@@ -631,8 +687,191 @@ function connect() {
     ws.onerror = () => ws.close();
 }
 
+// --- Vintage CRT Authentication Controller ---
+function showAuthModal(setupMode = false, message = "") {
+    isSetupMode = setupMode;
+    const overlay = $("authOverlay");
+    const modalTitle = $("authModalTitle");
+    const modeBadge = $("authModeBadge");
+    const subtitle = $("authSubtitle");
+    const submitText = $("authSubmitText");
+    const note = $("authVaultNote");
+    const alertBox = $("authAlert");
+
+    if (alertBox) {
+        if (message) {
+            alertBox.className = "auth-alert error";
+            alertBox.innerHTML = `<span>[ ! ]</span> <span>${esc(message)}</span>`;
+            alertBox.style.display = "flex";
+        } else {
+            alertBox.style.display = "none";
+        }
+    }
+
+    if (setupMode) {
+        if (modalTitle) modalTitle.textContent = "SECURITY TERMINAL // FIRST-TIME SETUP";
+        if (modeBadge) modeBadge.textContent = "INITIALIZE MASTER OPERATOR";
+        if (subtitle) subtitle.textContent = "CREATE MASTER ADMINISTRATOR ACCOUNT FOR SQLITE VAULT";
+        if (submitText) submitText.textContent = "INITIALIZE MASTER ACCOUNT";
+        if (note) note.textContent = "BOOTSTRAPPING SQLITE CREDENTIAL VAULT";
+    } else {
+        if (modalTitle) modalTitle.textContent = "SECURITY TERMINAL // ACCESS GATEWAY";
+        if (modeBadge) modeBadge.textContent = "AUTHENTICATION REQUIRED";
+        if (subtitle) subtitle.textContent = "VERIFYING OPERATOR AUTHORIZATION TO RETRIEVE TELEMETRY";
+        if (submitText) submitText.textContent = "LOG IN OPERATOR";
+        if (note) note.textContent = "SQLITE MEMORY-HARD SCRYPT ENCRYPTION";
+    }
+
+    if (overlay) overlay.style.display = "flex";
+    const userInp = $("authUsername");
+    if (userInp) {
+        if (!userInp.value && currentOperator) userInp.value = currentOperator;
+        userInp.focus();
+    }
+}
+
+function hideAuthModal() {
+    const overlay = $("authOverlay");
+    if (overlay) overlay.style.display = "none";
+}
+
+function updateOperatorBadge(username) {
+    currentOperator = username || "Operator";
+    const badge = $("userBadgeArea");
+    const nameEl = $("operatorName");
+    if (badge && nameEl) {
+        nameEl.textContent = currentOperator.toUpperCase();
+        badge.style.display = "inline-flex";
+    }
+}
+
+async function checkAuthStatus() {
+    try {
+        const res = await fetch("/api/auth/status", {
+            headers: { "X-Auth-Token": authToken }
+        });
+        const data = await res.json();
+
+        if (!data.has_users) {
+            // First run: No users in SQLite database
+            showAuthModal(true);
+            return;
+        }
+
+        if (data.authenticated) {
+            hideAuthModal();
+            updateOperatorBadge(data.username);
+            connect();
+        } else {
+            showAuthModal(false);
+        }
+    } catch (e) {
+        console.error("Auth status error:", e);
+        connect();
+    }
+}
+
+function initAuthSystem() {
+    const form = $("authForm");
+    const modal = $("authModalCard");
+    const alertBox = $("authAlert");
+    const submitBtn = $("authSubmitBtn");
+    const submitText = $("authSubmitText");
+    const logoutBtn = $("logoutBtn");
+
+    if (logoutBtn) {
+        logoutBtn.onclick = async () => {
+            try {
+                await fetch("/api/auth/logout", {
+                    method: "POST",
+                    headers: { "X-Auth-Token": authToken }
+                });
+            } catch (_) {}
+            localStorage.removeItem("dash_token");
+            sessionStorage.removeItem("dash_token");
+            localStorage.removeItem("dash_operator");
+            sessionStorage.removeItem("dash_operator");
+            authToken = "";
+            currentOperator = "";
+            if (ws) ws.close();
+            const badge = $("userBadgeArea");
+            if (badge) badge.style.display = "none";
+            showAuthModal(false, "Operator session terminated.");
+        };
+    }
+
+    if (form) {
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const userInp = $("authUsername");
+            const passInp = $("authPassword");
+            const username = userInp ? userInp.value.trim() : "";
+            const password = passInp ? passInp.value : "";
+
+            if (!username || !password) return;
+
+            const endpoint = isSetupMode ? "/api/auth/setup" : "/api/auth/login";
+            const originalText = submitText ? submitText.textContent : "SUBMIT";
+            if (submitText) submitText.textContent = "AUTHENTICATING...";
+            if (submitBtn) submitBtn.disabled = true;
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Authentication rejected");
+                }
+
+                // Authentication succeeded
+                authToken = data.token;
+                currentOperator = data.username;
+                localStorage.setItem("dash_token", authToken);
+                localStorage.setItem("dash_operator", currentOperator);
+
+                if (alertBox) {
+                    alertBox.className = "auth-alert success";
+                    alertBox.innerHTML = `<span>[ ✔ ]</span> <span>ACCESS GRANTED // INITIALIZING TELEMETRY...</span>`;
+                    alertBox.style.display = "flex";
+                }
+
+                setTimeout(() => {
+                    hideAuthModal();
+                    updateOperatorBadge(currentOperator);
+                    passInp.value = "";
+                    connect();
+                }, 350);
+
+            } catch (err) {
+                if (modal) {
+                    modal.classList.add("shake");
+                    setTimeout(() => modal.classList.remove("shake"), 400);
+                }
+                if (alertBox) {
+                    alertBox.className = "auth-alert error";
+                    alertBox.innerHTML = `<span>[ ! ]</span> <span>${esc(err.message || "Invalid operator credentials")}</span>`;
+                    alertBox.style.display = "flex";
+                }
+                if (passInp) {
+                    passInp.value = "";
+                    passInp.focus();
+                }
+            } finally {
+                if (submitText) submitText.textContent = originalText;
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        };
+    }
+
+    checkAuthStatus();
+}
+
 initCharts();
-connect();
+initAuthSystem();
 
 // --- Device Status & Target Management ---
 async function fetchDeviceStatus() {

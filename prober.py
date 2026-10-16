@@ -1,17 +1,16 @@
 """
 WindyDash - Active Network Probe Engine
 Performs concurrent asynchronous ping, TCP, and HTTP availability and latency checks.
-Caches targets in memory and only re-reads the target file when it changes on disk.
+Caches targets in memory from SQLite for zero disk I/O during monitoring loops.
 Includes standard library fallbacks if httpx is not installed.
 """
 import asyncio
-import json
 import platform
 import re
 import time
 import urllib.request
 from typing import Dict, Any, List, Optional, Tuple
-from config import TARGETS_FILE
+import database
 
 try:
     import httpx
@@ -22,8 +21,7 @@ class NetworkMonitor:
     def __init__(self):
         # Persistent async HTTP client with connection pooling
         self.http_client = httpx.AsyncClient(verify=False, timeout=4.0, follow_redirects=True) if httpx else None
-        self._cached_targets: List[Dict[str, Any]] = []
-        self._last_targets_mtime: float = 0.0
+        self._cached_targets: List[Dict[str, Any]] = database.get_targets()
 
     async def close(self):
         """Cleanly close client connections on daemon shutdown."""
@@ -32,39 +30,17 @@ class NetworkMonitor:
 
     def load_targets(self) -> List[Dict[str, Any]]:
         """
-        Load targets from disk with mtime caching.
-        Avoids reading and parsing JSON from disk every probe cycle.
+        Return targets from in-memory cache, loaded from SQLite database.
+        Zero disk I/O overhead during routine probe intervals.
         """
-        if not TARGETS_FILE.exists():
-            default_targets = [
-                {"id": "1", "name": "Cloudflare DNS", "host": "1.1.1.1", "method": "ping"},
-                {"id": "2", "name": "Google DNS", "host": "8.8.8.8", "method": "tcp", "port": 53},
-                {"id": "3", "name": "GitHub API", "host": "api.github.com", "method": "http"}
-            ]
-            try:
-                TARGETS_FILE.write_text(json.dumps(default_targets, indent=2))
-            except Exception:
-                pass
-            self._cached_targets = default_targets
-            return default_targets
+        if not self._cached_targets:
+            self._cached_targets = database.get_targets()
+        return self._cached_targets
 
-        try:
-            mtime = TARGETS_FILE.stat().st_mtime
-            if mtime != self._last_targets_mtime or not self._cached_targets:
-                self._last_targets_mtime = mtime
-                self._cached_targets = json.loads(TARGETS_FILE.read_text())
-            return self._cached_targets
-        except Exception:
-            return self._cached_targets or []
-
-    def save_targets(self, targets: List[Dict[str, Any]]):
-        """Save updated target list to disk and update cache."""
-        self._cached_targets = targets
-        TARGETS_FILE.write_text(json.dumps(targets, indent=2))
-        try:
-            self._last_targets_mtime = TARGETS_FILE.stat().st_mtime
-        except Exception:
-            pass
+    def refresh_targets(self) -> List[Dict[str, Any]]:
+        """Force refresh of in-memory target cache from SQLite database."""
+        self._cached_targets = database.get_targets()
+        return self._cached_targets
 
     async def check_ping(self, host: str) -> Tuple[bool, Optional[float], str]:
         """Async non-blocking ICMP ping probe."""

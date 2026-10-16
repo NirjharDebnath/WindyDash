@@ -4,6 +4,7 @@ Engineered for minimal CPU and memory footprints.
 Uses caching, sysfs path pre-resolution, and decoupled sampling intervals.
 """
 import asyncio
+import json
 import os
 import platform
 import re
@@ -60,6 +61,134 @@ class HardwareMonitor:
         self.cached_sensor_descriptors: List[Dict[str, Any]] = []
         self.last_sensor_sample = 0.0
         self.cached_sensors: Dict[str, Any] = {}
+
+        # Permanent CPU hardware specifications cache (probed once at startup)
+        self.cached_lscpu_details: Dict[str, Any] = self._collect_lscpu_details()
+
+    def _collect_lscpu_details(self) -> Dict[str, Any]:
+        """
+        Probe and parse detailed CPU topology, cache hierarchy, and features from lscpu.
+        Cached permanently on startup so it incurs 0.0ms overhead during routine telemetry loops.
+        """
+        flat = {}
+        flags_str = ""
+
+        # 1. Try lscpu -J (structured JSON)
+        try:
+            raw = subprocess.check_output(["lscpu", "-J"], text=True, timeout=2.0)
+            data = json.loads(raw)
+            def walk(items):
+                nonlocal flags_str
+                for item in items:
+                    f = item.get("field", "").rstrip(":").strip()
+                    d = item.get("data")
+                    if f and d is not None:
+                        flat[f] = str(d).strip()
+                        if f.lower() == "flags":
+                            flags_str = str(d).strip()
+                    if "children" in item:
+                        walk(item["children"])
+            walk(data.get("lscpu", []))
+        except Exception:
+            # 2. Fallback to standard lscpu text output
+            try:
+                raw = subprocess.check_output(["lscpu"], text=True, timeout=2.0)
+                for line in raw.splitlines():
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        flat[k.strip()] = v.strip()
+                        if k.strip().lower() == "flags":
+                            flags_str = v.strip()
+            except Exception:
+                pass
+
+        # 3. Fallback to /proc/cpuinfo if model name or cores missing
+        if not flat.get("Model name"):
+            cpuinfo = Path("/proc/cpuinfo")
+            if cpuinfo.exists():
+                try:
+                    for line in cpuinfo.read_text(errors="ignore").splitlines():
+                        if ":" in line:
+                            k, v = line.split(":", 1)
+                            k = k.strip()
+                            v = v.strip()
+                            if k == "model name" and not flat.get("Model name"):
+                                flat["Model name"] = v
+                            elif k == "flags" and not flags_str:
+                                flags_str = v
+                            elif k == "cpu cores" and not flat.get("Core(s) per socket"):
+                                flat["Core(s) per socket"] = v
+                except Exception:
+                    pass
+
+        # Filter prominent instruction extensions
+        notable_flags = ["avx512", "avx2", "avx", "fma", "aes", "sha_ni", "sse4_2", "sse4_1", "vmx", "svm", "rdrand", "bmi2"]
+        found_flags = []
+        lower_flags = flags_str.lower().split()
+        for nf in notable_flags:
+            if any(nf in f for f in lower_flags):
+                found_flags.append(nf.upper().replace("_", "-"))
+
+        # Extract vulnerability stats
+        vuln_not_affected = 0
+        vuln_mitigated = 0
+        for k, v in flat.items():
+            if "vulnerability" in k.lower():
+                if "not affected" in v.lower():
+                    vuln_not_affected += 1
+                elif "mitigation" in v.lower():
+                    vuln_mitigated += 1
+
+        vuln_summary = f"{vuln_not_affected} immune, {vuln_mitigated} mitigated" if (vuln_not_affected or vuln_mitigated) else "Protected"
+
+        model_name = flat.get("Model name") or flat.get("Architecture") or platform.processor() or "Generic Processor"
+        freq_max = flat.get("CPU max MHz", "")
+        if freq_max:
+            try:
+                f_val = float(freq_max)
+                freq_max_str = f"{f_val / 1000.0:.2f} GHz" if f_val >= 1000 else f"{f_val:.0f} MHz"
+            except Exception:
+                freq_max_str = f"{freq_max} MHz"
+        else:
+            freq_max_str = "N/A"
+
+        freq_min = flat.get("CPU min MHz", "")
+        if freq_min:
+            try:
+                f_val = float(freq_min)
+                freq_min_str = f"{f_val:.0f} MHz"
+            except Exception:
+                freq_min_str = f"{freq_min} MHz"
+        else:
+            freq_min_str = "N/A"
+
+        return {
+            "model_name": model_name,
+            "vendor_id": flat.get("Vendor ID", ""),
+            "architecture": flat.get("Architecture", platform.machine()),
+            "op_modes": flat.get("CPU op-mode(s)", "64-bit"),
+            "address_sizes": flat.get("Address sizes", ""),
+            "byte_order": flat.get("Byte Order", "Little Endian"),
+            "family": flat.get("CPU family", ""),
+            "model": flat.get("Model", ""),
+            "stepping": flat.get("Stepping", ""),
+            "threads_per_core": flat.get("Thread(s) per core", "1"),
+            "cores_per_socket": flat.get("Core(s) per socket", str(psutil.cpu_count(False) or 1)),
+            "sockets": flat.get("Socket(s)", "1"),
+            "total_cpus": flat.get("CPU(s)", str(psutil.cpu_count(True) or 1)),
+            "freq_boost": flat.get("Frequency boost", "enabled").title(),
+            "freq_max": freq_max_str,
+            "freq_min": freq_min_str,
+            "bogomips": flat.get("BogoMIPS", ""),
+            "virtualization": flat.get("Virtualization", "AMD-V" if "svm" in lower_flags else ("VT-x" if "vmx" in lower_flags else "None")),
+            "l1d": flat.get("L1d cache", flat.get("L1d", "N/A")),
+            "l1i": flat.get("L1i cache", flat.get("L1i", "N/A")),
+            "l2": flat.get("L2 cache", flat.get("L2", "N/A")),
+            "l3": flat.get("L3 cache", flat.get("L3", "N/A")),
+            "numa_nodes": flat.get("NUMA node(s)", "1"),
+            "key_flags": found_flags[:8],
+            "vuln_summary": vuln_summary
+        }
 
     def _detect_gpu(self) -> Optional[str]:
         """Detect presence of dedicated GPU (NVIDIA)."""
@@ -484,7 +613,8 @@ class HardwareMonitor:
                 "physical_cores": psutil.cpu_count(False) or 1,
                 "freq_current_mhz": sum(cfreq) / len(cfreq) if cfreq else 0.0,
                 "ctx_switches": psutil.cpu_stats().ctx_switches,
-                "model": platform.processor()
+                "model": self.cached_lscpu_details.get("model_name") or platform.processor(),
+                "details": self.cached_lscpu_details
             },
             "memory": {
                 "total": vm.total,

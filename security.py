@@ -1,13 +1,14 @@
 """
 WindyDash - Security & Rate Limiting
-Provides timing-attack safe token authentication and a self-pruning sliding-window rate limiter.
-Includes graceful fallbacks if FastAPI is not yet installed in the current environment.
+Provides timing-attack safe token authentication against SQLite session vault
+and a self-pruning sliding-window rate limiter.
 """
 import hmac
 import time
 from collections import defaultdict
-from typing import Any
+from typing import Any, Optional
 from config import AUTH_TOKEN, RATE_LIMIT, RATE_WINDOW
+import database
 
 try:
     from fastapi import Request, HTTPException, Depends
@@ -23,22 +24,58 @@ except ImportError:
     def Depends(dependency: Any) -> Any:  # type: ignore
         return dependency
 
-# Track request timestamps per IP address
+# Track request timestamps per IP address for rate limiting
 _ip_request_history = defaultdict(list)
 _last_cleanup = time.monotonic()
 
-def verify_token(token: str) -> bool:
-    """Safely compare the given token against the configured password using constant-time comparison."""
-    if not AUTH_TOKEN:
-        # If no password is set, authentication is bypassed
-        return True
-    return hmac.compare_digest(str(token or ""), AUTH_TOKEN)
+def verify_token(token: str) -> Optional[str]:
+    """
+    Verify the given token against active SQLite sessions or legacy AUTH_TOKEN.
+    Returns the authenticated username if valid, or None if invalid.
+    """
+    token_str = str(token or "").strip()
+    if not token_str:
+        # If the database has no registered users and no master password is set, allow guest
+        if not database.has_users() and not AUTH_TOKEN:
+            return "guest"
+        return None
 
-def check_auth(request: Request):
-    """FastAPI dependency to verify the X-Auth-Token header."""
-    token = getattr(request, "headers", {}).get("X-Auth-Token", "")
-    if not verify_token(token):
+    # 1. Check against SQLite session store
+    username = database.verify_session(token_str)
+    if username:
+        return username
+
+    # 2. Check against legacy DASH_PASSWORD / AUTH_TOKEN (constant-time comparison)
+    if AUTH_TOKEN and hmac.compare_digest(token_str, AUTH_TOKEN):
+        return "admin"
+
+    return None
+
+def is_valid_token(token: str) -> bool:
+    """Return True if token represents a valid authenticated session."""
+    return verify_token(token) is not None
+
+def check_auth(request: Request) -> str:
+    """
+    FastAPI dependency to verify authentication token from headers or query parameters.
+    Returns the authenticated username or raises HTTP 401.
+    """
+    token = ""
+    headers = getattr(request, "headers", {})
+    if "X-Auth-Token" in headers:
+        token = headers.get("X-Auth-Token", "")
+    elif "authorization" in headers:
+        auth_header = headers.get("authorization", "")
+        if auth_header.lower().startswith("bearer "):
+            token = auth_header[7:].strip()
+    if not token:
+        query_params = getattr(request, "query_params", {})
+        token = query_params.get("token", "")
+
+    username = verify_token(token)
+    if not username:
         raise HTTPException(status_code=401, detail="Unauthorized")
+    return username
 
 def rate_limiter(request: Request):
     """
@@ -59,7 +96,7 @@ def rate_limiter(request: Request):
     history.append(now)
     _ip_request_history[client_ip] = history
 
-    # Periodic garbage collection: prune keys every 60 seconds
+    # Periodic garbage collection: prune stale IPs every 60 seconds
     if now - _last_cleanup > 60.0:
         _last_cleanup = now
         stale_ips = [

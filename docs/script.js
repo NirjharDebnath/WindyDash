@@ -60,15 +60,20 @@ function updateEnvPreview() {
     const interval = (inpInterval && inpInterval.value.trim()) || "1.0";
     const host = (inpHost && inpHost.value.trim()) || "127.0.0.1";
     const port = (inpPort && inpPort.value.trim()) || "4242";
-    const password = (inpPassword && inpPassword.value.trim()) || "SecretMasterPassword";
+    const password = inpPassword ? inpPassword.value.trim() : "";
     const rate = (inpRate && inpRate.value.trim()) || "25";
+
+    let passLine = "# DASH_PASSWORD= (Operators managed in SQLite vault)";
+    if (password) {
+        passLine = `DASH_PASSWORD=${password}`;
+    }
 
     const content = `# WindyDash Daemon Configuration (.env)
 # ----------------------------------------
 SYSMON_INTERVAL=${interval}
 SYSMON_HOST=${host}
 SYSMON_PORT=${port}
-DASH_PASSWORD=${password}
+${passLine}
 RATE_LIMIT=${rate}
 RATE_WINDOW=5.0
 `;

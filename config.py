@@ -26,6 +26,7 @@ except ImportError:
             pass
 
 # Paths
+DATABASE_FILE = BASE_DIR / "windydash.db"
 TARGETS_FILE = BASE_DIR / "targets.json"
 
 # Server configuration with safe defaults
