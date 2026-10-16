@@ -1,7 +1,13 @@
-# 🍁 WindyDash MK-II
+# 🍁 WindyDash V-2.0
 
 > **Low Latency. Hardware Precision. Zero Bloat.**  
 > A high-performance, lightweight Linux system monitor, active network diagnostic suite, and retro telemetry console.
+
+<div style="display: flex; justify-content: space-between;">
+  <img src="assets/light-mode.png" style="width: 49%;" alt="First Image">
+  <img src="assets/dark-mode.png" style="width: 49%;" alt="Second Image">
+</div><br>
+
 
 [![Linux](https://img.shields.io/badge/Platform-Linux-orange.svg)](https://kernel.org)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://python.org)
