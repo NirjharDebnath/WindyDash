@@ -10,7 +10,7 @@ import sys
 from contextlib import asynccontextmanager
 from typing import Optional, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, status
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
 import uvicorn
 
@@ -140,6 +140,11 @@ async def get_css():
 @app.get("/app.js")
 async def get_js():
     return FileResponse(BASE_DIR / "app.js")
+
+@app.get("/favicon.ico")
+async def get_favicon():
+    svg_icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍁</text></svg>'
+    return Response(content=svg_icon, media_type="image/svg+xml")
 
 # --- Authentication & Session APIs ---
 
