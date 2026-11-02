@@ -65,6 +65,91 @@ class HardwareMonitor:
         # Permanent CPU hardware specifications cache (probed once at startup)
         self.cached_lscpu_details: Dict[str, Any] = self._collect_lscpu_details()
 
+        # Permanent Memory & DIMM hardware specifications cache (probed once at startup)
+        self.cached_memory_hardware: Dict[str, Any] = self._collect_dmi_memory_details()
+
+        # Permanent Physical Block Devices & NVMe topology cache (probed once at startup)
+        self.cached_physical_disks: List[Dict[str, Any]] = self._collect_physical_disks()
+
+        # Permanent OS Distribution & platform specifications cache (probed once at startup)
+        self.cached_os_details: Dict[str, Any] = self._collect_os_details()
+
+    def _collect_os_details(self) -> Dict[str, Any]:
+        """
+        Probe Linux distribution release metadata, kernel build, and system runtime info.
+        Cached permanently at startup to incur 0.0ms telemetry overhead.
+        """
+        info = {
+            "distro_name": "Linux",
+            "distro_version": "",
+            "pretty_name": "Linux",
+            "codename": "",
+            "id_like": "",
+            "kernel": platform.release(),
+            "kernel_version": platform.version(),
+            "arch": platform.machine(),
+            "hostname": socket.gethostname(),
+            "libc": "glibc",
+            "init_system": "systemd",
+            "timezone": "UTC",
+            "hardware_model": ""
+        }
+
+        try:
+            os_rel = platform.freedesktop_os_release()
+            info["distro_name"] = os_rel.get("NAME", "Linux")
+            info["distro_version"] = os_rel.get("VERSION_ID", "")
+            info["pretty_name"] = os_rel.get("PRETTY_NAME", os_rel.get("NAME", "Linux"))
+            info["codename"] = os_rel.get("VERSION_CODENAME", "")
+            info["id_like"] = os_rel.get("ID_LIKE", os_rel.get("ID", ""))
+        except Exception:
+            p = Path("/etc/os-release")
+            if p.exists():
+                for line in p.read_text(errors="ignore").splitlines():
+                    if "=" in line:
+                        k, v = line.split("=", 1)
+                        v = v.strip("\"'")
+                        if k == "PRETTY_NAME":
+                            info["pretty_name"] = v
+                        elif k == "NAME" and info["distro_name"] == "Linux":
+                            info["distro_name"] = v
+                        elif k == "VERSION_ID":
+                            info["distro_version"] = v
+                        elif k == "VERSION_CODENAME":
+                            info["codename"] = v
+                        elif k == "ID_LIKE":
+                            info["id_like"] = v
+
+        try:
+            libc_ver = platform.libc_ver()
+            if libc_ver and libc_ver[0]:
+                info["libc"] = f"{libc_ver[0]} {libc_ver[1]}"
+        except Exception:
+            pass
+
+        try:
+            tz_path = Path("/etc/timezone")
+            if tz_path.exists():
+                info["timezone"] = tz_path.read_text(errors="ignore").strip()
+            else:
+                localtime_target = os.path.realpath("/etc/localtime")
+                if "zoneinfo/" in localtime_target:
+                    info["timezone"] = localtime_target.split("zoneinfo/")[-1]
+                else:
+                    info["timezone"] = time.tzname[0]
+        except Exception:
+            info["timezone"] = time.tzname[0] if time.tzname else "UTC"
+
+        for dmi_file in ["/sys/class/dmi/id/product_name", "/sys/class/dmi/id/product_version", "/sys/devices/virtual/dmi/id/product_name"]:
+            p = Path(dmi_file)
+            if p.exists():
+                m_txt = read_text(p)
+                if m_txt and m_txt.lower() not in ("none", "unknown", "to be filled by o.e.m."):
+                    info["hardware_model"] = m_txt
+                    break
+
+        return info
+
     def _collect_lscpu_details(self) -> Dict[str, Any]:
         """
         Probe and parse detailed CPU topology, cache hierarchy, and features from lscpu.
@@ -188,6 +273,309 @@ class HardwareMonitor:
             "numa_nodes": flat.get("NUMA node(s)", "1"),
             "key_flags": found_flags[:8],
             "vuln_summary": vuln_summary
+        }
+
+    def _collect_dmi_memory_details(self) -> Dict[str, Any]:
+        """
+        Probe and parse physical memory topology, DIMM slots, clock speeds, and hardware specs.
+        Attempts native dmidecode, then non-blocking sudo -n dmidecode, then lshw.
+        Cached permanently at startup so it incurs 0.0ms overhead in live telemetry loops.
+        """
+        fallback_res = {
+            "available": False,
+            "requires_root": True,
+            "error": "Root or sudo privileges required to inspect SMBIOS physical memory tables.",
+            "source": "none",
+            "array": {
+                "max_capacity": "N/A",
+                "total_slots": 0,
+                "installed_slots": 0,
+                "ecc_type": "None",
+                "location": "System Board",
+                "use": "System Memory"
+            },
+            "slots": [],
+            "summary": {
+                "technology": "System Memory",
+                "speed": "N/A",
+                "channels": "N/A",
+                "total_installed_bytes": 0,
+                "total_installed_human": "N/A"
+            }
+        }
+
+        # 1. Attempt dmidecode directly, then via non-interactive sudo
+        dmi_cmds = [
+            ["dmidecode", "-t", "16,17"],
+            ["sudo", "-n", "dmidecode", "-t", "16,17"]
+        ]
+        raw_dmi = ""
+        for cmd in dmi_cmds:
+            try:
+                p = subprocess.run(cmd, capture_output=True, text=True, timeout=2.0)
+                if p.returncode == 0 and ("DMI type 16" in p.stdout or "DMI type 17" in p.stdout or "Memory Device" in p.stdout):
+                    raw_dmi = p.stdout
+                    break
+            except Exception:
+                pass
+
+        if raw_dmi:
+            try:
+                parsed = self._parse_dmi_memory(raw_dmi)
+                parsed["available"] = True
+                parsed["requires_root"] = False
+                parsed["error"] = ""
+                parsed["source"] = "dmidecode"
+                return parsed
+            except Exception:
+                pass
+
+        # 2. Fallback to lshw (supports -json)
+        lshw_cmds = [
+            ["lshw", "-C", "memory", "-json"],
+            ["sudo", "-n", "lshw", "-C", "memory", "-json"]
+        ]
+        for cmd in lshw_cmds:
+            try:
+                p = subprocess.run(cmd, capture_output=True, text=True, timeout=2.0)
+                if p.returncode == 0 and p.stdout.strip():
+                    parsed_lshw = self._parse_lshw_memory(p.stdout)
+                    if parsed_lshw and parsed_lshw.get("slots"):
+                        parsed_lshw["available"] = True
+                        parsed_lshw["requires_root"] = False
+                        parsed_lshw["error"] = ""
+                        parsed_lshw["source"] = "lshw"
+                        return parsed_lshw
+            except Exception:
+                pass
+
+        return fallback_res
+
+    def _parse_dmi_memory(self, raw_text: str) -> Dict[str, Any]:
+        """Parse raw text from dmidecode -t 16,17 into structured memory hardware topology."""
+        array_info = {
+            "max_capacity": "N/A",
+            "total_slots": 0,
+            "installed_slots": 0,
+            "ecc_type": "None",
+            "location": "System Board",
+            "use": "System Memory"
+        }
+        slots = []
+
+        records = raw_text.split("Handle 0x")
+        for rec in records:
+            if not rec.strip():
+                continue
+            lines = rec.strip().splitlines()
+            first_line = lines[0] if lines else ""
+            title = lines[1].strip() if len(lines) > 1 else ""
+
+            kv = {}
+            for line in lines[2:]:
+                if ":" in line:
+                    k, v = line.split(":", 1)
+                    kv[k.strip()] = v.strip()
+
+            if "DMI type 16" in first_line or title == "Physical Memory Array":
+                if "Maximum Capacity" in kv:
+                    array_info["max_capacity"] = kv["Maximum Capacity"]
+                if "Number Of Devices" in kv:
+                    try:
+                        array_info["total_slots"] = int(kv["Number Of Devices"])
+                    except Exception:
+                        pass
+                if "Error Correction Type" in kv:
+                    array_info["ecc_type"] = kv["Error Correction Type"]
+                if "Location" in kv:
+                    array_info["location"] = kv["Location"]
+                if "Use" in kv:
+                    array_info["use"] = kv["Use"]
+
+            elif "DMI type 17" in first_line or title == "Memory Device":
+                size_raw = kv.get("Size", "")
+                is_empty = (
+                    not size_raw or
+                    "no module" in size_raw.lower() or
+                    size_raw.lower() in ("none", "unknown", "0 mb", "0 b")
+                )
+
+                size_bytes = 0
+                if not is_empty:
+                    try:
+                        parts = size_raw.split()
+                        val = float(parts[0])
+                        unit = parts[1].upper() if len(parts) > 1 else "MB"
+                        if "G" in unit:
+                            size_bytes = int(val * 1024 * 1024 * 1024)
+                        elif "M" in unit:
+                            size_bytes = int(val * 1024 * 1024)
+                        elif "K" in unit:
+                            size_bytes = int(val * 1024)
+                    except Exception:
+                        pass
+
+                speed_val = kv.get("Configured Memory Speed") or kv.get("Configured Clock Speed") or kv.get("Speed", "")
+                if speed_val.lower() in ("unknown", "none"):
+                    speed_val = kv.get("Speed", "")
+                if speed_val.lower() in ("unknown", "none"):
+                    speed_val = "N/A"
+
+                mfr = kv.get("Manufacturer", "")
+                if mfr.lower() in ("not specified", "unknown", "none", "0x0000"):
+                    mfr = ""
+
+                part_no = kv.get("Part Number", "")
+                if part_no.lower() in ("not specified", "unknown", "none"):
+                    part_no = ""
+
+                serial_no = kv.get("Serial Number", "")
+                if serial_no.lower() in ("not specified", "unknown", "none"):
+                    serial_no = ""
+
+                mem_type = kv.get("Type", "")
+                if mem_type.lower() in ("unknown", "none"):
+                    mem_type = "N/A"
+
+                form_factor = kv.get("Form Factor", "")
+                if form_factor.lower() in ("unknown", "none"):
+                    form_factor = "DIMM"
+
+                slot_name = kv.get("Locator") or f"Slot {len(slots)}"
+                bank = kv.get("Bank Locator", "")
+
+                slots.append({
+                    "slot_name": slot_name,
+                    "bank": bank,
+                    "installed": not is_empty,
+                    "size": "Empty" if is_empty else size_raw,
+                    "size_bytes": size_bytes,
+                    "type": mem_type,
+                    "type_detail": kv.get("Type Detail", ""),
+                    "speed": speed_val,
+                    "configured_speed": kv.get("Configured Memory Speed") or kv.get("Configured Clock Speed") or speed_val,
+                    "manufacturer": mfr,
+                    "part_number": part_no,
+                    "serial_number": serial_no,
+                    "form_factor": form_factor,
+                    "rank": kv.get("Rank", ""),
+                    "voltage": kv.get("Configured Voltage") or kv.get("Minimum Voltage", "")
+                })
+
+        installed_count = sum(1 for s in slots if s["installed"])
+        if not array_info["total_slots"] and slots:
+            array_info["total_slots"] = len(slots)
+        array_info["installed_slots"] = installed_count
+
+        total_bytes = sum(s["size_bytes"] for s in slots if s["installed"])
+        total_gb = total_bytes / (1024**3)
+        total_human = f"{total_gb:.1f} GB".replace(".0 GB", " GB") if total_gb > 0 else "N/A"
+
+        tech = "Standard"
+        speed = "N/A"
+        for s in slots:
+            if s["installed"]:
+                if s["type"] != "N/A":
+                    tech = s["type"]
+                if s["speed"] != "N/A":
+                    speed = s["speed"]
+                break
+
+        if installed_count >= 4:
+            channels = "Quad Channel" if any("d" in s["slot_name"].lower() for s in slots) else "Dual Channel"
+        elif installed_count >= 2:
+            channels = "Dual Channel"
+        elif installed_count == 1:
+            channels = "Single Channel"
+        else:
+            channels = "N/A"
+
+        return {
+            "array": array_info,
+            "slots": slots,
+            "summary": {
+                "technology": tech,
+                "speed": speed,
+                "channels": channels,
+                "total_installed_bytes": total_bytes,
+                "total_installed_human": total_human
+            }
+        }
+
+    def _parse_lshw_memory(self, raw_json: str) -> Dict[str, Any]:
+        """Fallback parser for lshw -C memory -json output."""
+        try:
+            data = json.loads(raw_json)
+        except Exception:
+            return {}
+
+        nodes = data if isinstance(data, list) else [data]
+        slots = []
+        total_mem_bytes = 0
+
+        def walk(item):
+            nonlocal total_mem_bytes
+            cid = str(item.get("id", ""))
+            cls = str(item.get("class", ""))
+            size = item.get("size", 0)
+
+            if cid.startswith("bank:") or (cls == "memory" and "slot" in item):
+                installed = bool(size and size > 0)
+                if installed:
+                    total_mem_bytes += size
+                desc = str(item.get("description", ""))
+                tech = "DDR4" if "ddr4" in desc.lower() else ("DDR5" if "ddr5" in desc.lower() else ("DDR3" if "ddr3" in desc.lower() else "DIMM"))
+                clk = item.get("clock", 0)
+                speed_str = f"{clk // 1000000} MT/s" if clk > 1000000 else "N/A"
+                size_gb = size / (1024**3)
+                size_str = f"{size_gb:.1f} GB".replace(".0 GB", " GB") if size > 0 else "Empty"
+
+                slots.append({
+                    "slot_name": item.get("slot") or cid,
+                    "bank": item.get("physid", ""),
+                    "installed": installed,
+                    "size": size_str,
+                    "size_bytes": size,
+                    "type": tech,
+                    "type_detail": desc,
+                    "speed": speed_str,
+                    "configured_speed": speed_str,
+                    "manufacturer": item.get("vendor", ""),
+                    "part_number": item.get("product", ""),
+                    "serial_number": item.get("serial", ""),
+                    "form_factor": "SODIMM" if "sodimm" in desc.lower() else "DIMM",
+                    "rank": "",
+                    "voltage": ""
+                })
+
+            for child in item.get("children", []):
+                walk(child)
+
+        for n in nodes:
+            walk(n)
+
+        if not slots:
+            return {}
+
+        installed_count = sum(1 for s in slots if s["installed"])
+        total_gb = total_mem_bytes / (1024**3)
+        return {
+            "array": {
+                "max_capacity": f"{total_gb:.1f} GB".replace(".0 GB", " GB"),
+                "total_slots": len(slots),
+                "installed_slots": installed_count,
+                "ecc_type": "None",
+                "location": "System Board",
+                "use": "System Memory"
+            },
+            "slots": slots,
+            "summary": {
+                "technology": slots[0]["type"] if slots else "Standard",
+                "speed": slots[0]["speed"] if slots else "N/A",
+                "channels": "Dual Channel" if installed_count >= 2 else ("Single Channel" if installed_count == 1 else "N/A"),
+                "total_installed_bytes": total_mem_bytes,
+                "total_installed_human": f"{total_gb:.1f} GB".replace(".0 GB", " GB")
+            }
         }
 
     def _detect_gpu(self) -> Optional[str]:
@@ -355,16 +743,40 @@ class HardwareMonitor:
 
         self.last_fs_sample = now
         result = []
-        seen = set()
+        seen_devices = {}
         for part in psutil.disk_partitions(all=False):
-            if part.mountpoint in seen:
+            dev = part.device
+            mp = part.mountpoint
+            fstype = (part.fstype or "").lower()
+
+            # Filter out virtual loopback devices (e.g. Ubuntu snaps, squashfs images)
+            if dev.startswith("/dev/loop") or dev.startswith("loop") or fstype == "squashfs" or mp.startswith("/snap"):
                 continue
-            seen.add(part.mountpoint)
+
+            # Filter out pseudo filesystems
+            if fstype in ("overlay", "iso9660", "ramfs"):
+                continue
+
+            # Filter out nested container/package manager bind-mounts
+            if any(x in mp for x in ("/.cache", "/.config", "/.docker", "/.npm", "/.nvm", "/docker/", "/containerd/")):
+                continue
+
+            # If device already seen (e.g. identical partition bind-mounted multiple times), keep the root or shortest canonical mount
+            if dev in seen_devices:
+                old_idx = seen_devices[dev]
+                old_mp = result[old_idx]["mountpoint"]
+                if mp == "/":
+                    result[old_idx]["mountpoint"] = mp
+                elif old_mp != "/" and len(mp.split("/")) < len(old_mp.split("/")):
+                    result[old_idx]["mountpoint"] = mp
+                continue
+
             try:
-                u = psutil.disk_usage(part.mountpoint)
+                u = psutil.disk_usage(mp)
+                seen_devices[dev] = len(result)
                 result.append({
                     "device": part.device,
-                    "mountpoint": part.mountpoint,
+                    "mountpoint": mp,
                     "fstype": part.fstype,
                     "total": u.total,
                     "used": u.used,
@@ -375,6 +787,143 @@ class HardwareMonitor:
                 pass
         self.cached_fs = result
         return result
+
+    def _collect_physical_disks(self) -> List[Dict[str, Any]]:
+        """
+        Probe physical storage drives, NVMe solid state controllers, and PCIe transport bus.
+        Cached permanently at startup; temperatures are refreshed dynamically in sample_physical_disks.
+        """
+        disks = []
+        try:
+            res = subprocess.run(
+                ["lsblk", "-J", "-b", "-o", "NAME,PATH,MODEL,SERIAL,SIZE,TYPE,TRAN,ROTA,FSTYPE,MOUNTPOINT,HOTPLUG"],
+                capture_output=True, text=True, timeout=2.0
+            )
+            raw_devices = json.loads(res.stdout).get("blockdevices", []) if res.returncode == 0 else []
+        except Exception:
+            raw_devices = []
+
+        nvme_sysfs = {}
+        nvme_dir = Path("/sys/class/nvme")
+        if nvme_dir.exists():
+            for n in nvme_dir.glob("nvme*"):
+                ctrl_name = n.name
+                dev = n / "device"
+                link_speed = read_text(dev / "current_link_speed")
+                link_width = read_text(dev / "current_link_width")
+                pcie_bus = f"{link_speed} x{link_width}".strip() if link_speed or link_width else ""
+                hwmon_paths = list((n / "device").glob("hwmon*")) + list(n.glob("hwmon*"))
+
+                nvme_sysfs[ctrl_name] = {
+                    "model": read_text(n / "model"),
+                    "serial": read_text(n / "serial"),
+                    "firmware": read_text(n / "firmware_rev"),
+                    "transport": read_text(n / "transport") or "pcie",
+                    "pcie_link": pcie_bus,
+                    "hwmon_paths": [str(p) for p in hwmon_paths]
+                }
+
+        for b in raw_devices:
+            b_type = b.get("type", "")
+            name = b.get("name", "")
+            if b_type != "disk" and not name.startswith("nvme") and not name.startswith("sd") and not name.startswith("hd"):
+                continue
+            if name.startswith("loop") or name.startswith("ram") or name.startswith("zram"):
+                continue
+
+            tran = (b.get("tran") or "").lower()
+            if not tran and name.startswith("nvme"):
+                tran = "nvme"
+            elif not tran and name.startswith("sd"):
+                tran = "sata"
+
+            rota = b.get("rota", False)
+            if tran == "nvme":
+                media_type = "NVMe Solid State (PCIe)"
+            elif not rota:
+                media_type = "SATA Solid State (SSD)"
+            else:
+                media_type = "Mechanical Hard Drive (HDD)"
+
+            size_bytes = b.get("size") or 0
+            try:
+                size_bytes = int(size_bytes)
+            except Exception:
+                size_bytes = 0
+
+            # Match NVMe controller (e.g. nvme0 from nvme0n1)
+            m = re.match(r"(nvme\d+)", name)
+            ctrl_id = m.group(1) if m else ""
+            n_info = nvme_sysfs.get(ctrl_id, {})
+
+            model = (b.get("model") or n_info.get("model") or "Generic Drive").strip()
+            serial = (b.get("serial") or n_info.get("serial") or "").strip()
+            firmware = n_info.get("firmware", "")
+            pcie_link = n_info.get("pcie_link", "")
+
+            # If SATA SSD/HDD, check for firmware revision in sysfs
+            if not firmware and name.startswith("sd"):
+                firmware = read_text(Path(f"/sys/block/{name}/device/rev"))
+            if not model or model == "Generic Drive":
+                sysfs_model = read_text(Path(f"/sys/block/{name}/device/model"))
+                if sysfs_model:
+                    model = sysfs_model
+
+            partitions = []
+            for child in b.get("children", []):
+                c_name = child.get("name", "")
+                c_size = child.get("size", 0)
+                try:
+                    c_size = int(c_size)
+                except Exception:
+                    c_size = 0
+                partitions.append({
+                    "name": c_name,
+                    "path": child.get("path") or f"/dev/{c_name}",
+                    "size_bytes": c_size,
+                    "fstype": child.get("fstype") or "unknown",
+                    "mountpoint": child.get("mountpoint") or ""
+                })
+
+            disks.append({
+                "name": name,
+                "path": b.get("path") or f"/dev/{name}",
+                "model": model,
+                "serial": serial,
+                "firmware": firmware,
+                "transport": tran.upper() or "STORAGE",
+                "media_type": media_type,
+                "is_ssd": not rota,
+                "is_nvme": tran == "nvme",
+                "pcie_link": pcie_link,
+                "size_bytes": size_bytes,
+                "hwmon_paths": n_info.get("hwmon_paths", []),
+                "partitions": partitions
+            })
+
+        return disks
+
+    def sample_physical_disks(self) -> List[Dict[str, Any]]:
+        """Sample dynamic temperatures and live partition attachments for physical storage drives."""
+        results = []
+        for disk in self.cached_physical_disks:
+            item = dict(disk)
+            temps = []
+            for hw_str in item.get("hwmon_paths", []):
+                hw = Path(hw_str)
+                if hw.exists():
+                    for tf in sorted(hw.glob("temp*_input")):
+                        try:
+                            t_val = int(read_text(tf)) / 1000.0
+                            label_file = tf.with_name(tf.name.replace("_input", "_label"))
+                            lbl = read_text(label_file) if label_file.exists() else tf.stem
+                            temps.append({"label": lbl, "temp_c": round(t_val, 1)})
+                        except Exception:
+                            pass
+            item["temperatures"] = temps
+            item["temp_c"] = temps[0]["temp_c"] if temps else None
+            results.append(item)
+        return results
 
     def sample_peripherals(self) -> Dict[str, Any]:
         """Sample displays, USB, and Thunderbolt devices at an optimized 15s interval."""
@@ -627,14 +1176,24 @@ class HardwareMonitor:
                 "active_bytes": mi.get("Active", 0),
                 "inactive_bytes": mi.get("Inactive", 0),
                 "page_tables_bytes": mi.get("PageTables", 0),
+                "shmem_bytes": mi.get("Shmem", 0),
+                "slab_bytes": mi.get("Slab", 0),
+                "s_reclaimable_bytes": mi.get("SReclaimable", 0),
+                "s_unreclaim_bytes": mi.get("SUnreclaim", 0),
+                "dirty_bytes": mi.get("Dirty", 0),
+                "writeback_bytes": mi.get("Writeback", 0),
+                "mapped_bytes": mi.get("Mapped", 0),
+                "committed_as_bytes": mi.get("Committed_AS", 0),
+                "commit_limit_bytes": mi.get("CommitLimit", 0),
                 "swap_total": sw.total,
                 "swap_free": sw.free,
                 "swap_used": sw.used,
-                "swap_percent": sw.percent
+                "swap_percent": sw.percent,
+                "hardware": self.cached_memory_hardware
             },
             "system": {
                 "hostname": socket.gethostname(),
-                "os": platform.platform(),
+                "os": self.cached_os_details.get("pretty_name") or "Linux",
                 "kernel": platform.release(),
                 "arch": platform.machine(),
                 "python": platform.python_version(),
@@ -646,7 +1205,8 @@ class HardwareMonitor:
                 "boot_time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(boot)),
                 "process_count": len(psutil.pids()),
                 "thread_count": thread_count,
-                "open_files": open_files
+                "open_files": open_files,
+                "details": self.cached_os_details
             },
             "network": {
                 "bytes_sent": tx,
@@ -666,6 +1226,7 @@ class HardwareMonitor:
                 "write_bytes_per_sec": max(0.0, (write_bytes - oldwrite) / dt)
             },
             "filesystems": self.sample_filesystems(),
+            "physical_disks": self.sample_physical_disks(),
             "sensors": self.sample_sensors(),
             "battery": self.sample_batteries(),
             "gpu": self.cached_gpu,

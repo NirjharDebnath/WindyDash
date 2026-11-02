@@ -347,9 +347,18 @@ function updateHardware(d) {
         $("quickSystem").innerHTML = [["Hostname", s.hostname], ["OS", s.os], ["Kernel", s.kernel], ["Uptime", s.uptime_human]]
             .map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
     }
+    const sysDet = s.details || {};
     if ($("systemInfo")) {
-        $("systemInfo").innerHTML = [["Boot", s.boot_time], ["CPU model", c.model], ["Python", s.python]]
-            .map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+        $("systemInfo").innerHTML = [
+            ["OS Distribution", s.os],
+            ["Kernel Release", s.kernel],
+            ["Hardware Model", sysDet.hardware_model || "Host Platform"],
+            ["Boot Timestamp", s.boot_time],
+            ["Operating Uptime", s.uptime_human],
+            ["Timezone", sysDet.timezone || "UTC"],
+            ["C Library", sysDet.libc || "glibc"],
+            ["Python Engine", s.python]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
     }
 
     // CPU Hero Banner & Badges
@@ -420,28 +429,242 @@ function updateHardware(d) {
         ].map(x => `<div>${esc(x[0])}</div><div>${x[1]}</div>`).join("");
     }
 
+    // Memory Hero Banner & DIMM Slots Topology
+    const memHw = m.hardware || {};
+    const memArray = memHw.array || {};
+    const memSummary = memHw.summary || {};
+    const memSlots = memHw.slots || [];
+
+    if ($("memFullSummary")) {
+        if (memHw.available && memSlots.length > 0) {
+            const installedCount = memSlots.filter(s => s.installed).length;
+            $("memFullSummary").textContent = `${memSummary.total_installed_human || fmtBytes(m.total)} ${memSummary.technology || "RAM"} (${installedCount}/${memSlots.length} Slots Occupied)`;
+        } else {
+            $("memFullSummary").textContent = `${fmtBytes(m.total)} Physical Memory Subsystem`;
+        }
+    }
+
+    if ($("memTagCapacity")) {
+        const maxCap = (memArray.max_capacity && memArray.max_capacity !== "N/A") ? `${memArray.max_capacity} Max` : `${fmtBytes(m.total)} Total`;
+        $("memTagCapacity").textContent = maxCap;
+    }
+    if ($("memTagSlots")) {
+        const totalSlots = memArray.total_slots || memSlots.length;
+        const installed = memArray.installed_slots || memSlots.filter(s => s.installed).length;
+        $("memTagSlots").textContent = totalSlots ? `${installed} / ${totalSlots} Slots` : "Standard Architecture";
+    }
+    if ($("memTagTech")) $("memTagTech").textContent = memSummary.technology || "DDR";
+    if ($("memTagSpeed")) $("memTagSpeed").textContent = (memSummary.speed && memSummary.speed !== "N/A") ? memSummary.speed : "Synchronous Bus";
+    if ($("memTagChannels")) $("memTagChannels").textContent = (memSummary.channels && memSummary.channels !== "N/A") ? memSummary.channels : "System Interconnect";
+    if ($("memTagECC")) {
+        const ecc = memArray.ecc_type && memArray.ecc_type.toLowerCase() !== "none" ? `ECC: ${memArray.ecc_type}` : "Non-ECC";
+        $("memTagECC").textContent = ecc;
+    }
+
+    // DIMM Slot Notice & Visual Grid
+    if ($("dimmSlotCountBadge")) {
+        if (memHw.available && memSlots.length > 0) {
+            const installed = memSlots.filter(s => s.installed).length;
+            $("dimmSlotCountBadge").textContent = `${installed} Active / ${memSlots.length} Total`;
+        } else {
+            $("dimmSlotCountBadge").textContent = memHw.requires_root ? "Superuser Required" : "Topology Scan";
+        }
+    }
+
+    if ($("dimmSlotNotice")) {
+        if (memHw.requires_root) {
+            $("dimmSlotNotice").style.display = "flex";
+            $("dimmSlotNotice").innerHTML = `
+                <span style="font-size:16px;">⚡</span>
+                <div>
+                    <b>SMBIOS Hardware Access:</b> Run WindyDash as a systemd service (e.g. <code>sudo ./service.sh update</code>) or with superuser privileges to unlock motherboard DIMM slot layout, module serial numbers, and bus clock frequencies.
+                </div>
+            `;
+        } else {
+            $("dimmSlotNotice").style.display = "none";
+        }
+    }
+
+    if ($("dimmSlotGrid")) {
+        if (memHw.available && memSlots.length > 0) {
+            $("dimmSlotGrid").innerHTML = memSlots.map((slot, idx) => {
+                if (slot.installed) {
+                    return `
+                        <div class="dimm-slot-card occupied">
+                            <div class="dimm-header">
+                                <span class="dimm-locator">${esc(slot.slot_name || `Slot ${idx}`)}</span>
+                                <span class="dimm-status-badge installed">Installed</span>
+                            </div>
+                            <div class="dimm-main-spec">
+                                <span class="dimm-capacity">${esc(slot.size)}</span>
+                                <span class="dimm-speed-tag">${esc(slot.type)} ${esc(slot.form_factor || "DIMM")}</span>
+                            </div>
+                            <div class="dimm-details-table">
+                                <span class="label">Clock Speed</span>
+                                <span class="val">${esc(slot.configured_speed || slot.speed || "N/A")}</span>
+                                <span class="label">Manufacturer</span>
+                                <span class="val">${esc(slot.manufacturer || "Generic / OEM")}</span>
+                                <span class="label">Part Number</span>
+                                <span class="val" title="${esc(slot.part_number)}">${esc(slot.part_number || "OEM Standard")}</span>
+                                <span class="label">Topology</span>
+                                <span class="val">${esc(slot.bank || `Channel ${idx}`)} ${slot.rank ? `(Rank ${slot.rank})` : ""}</span>
+                                ${slot.voltage ? `<span class="label">Voltage</span><span class="val">${esc(slot.voltage)}</span>` : ""}
+                            </div>
+                            <div class="dimm-pins" title="Physical Gold Contact Edge"></div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="dimm-slot-card empty-slot">
+                            <div class="dimm-header">
+                                <span class="dimm-locator">${esc(slot.slot_name || `Slot ${idx}`)}</span>
+                                <span class="dimm-status-badge empty">Empty Slot</span>
+                            </div>
+                            <div class="dimm-main-spec">
+                                <span class="dimm-capacity" style="color:var(--muted); font-size:18px;">Unpopulated</span>
+                                <span class="dimm-speed-tag">${esc(slot.form_factor || "DIMM")}</span>
+                            </div>
+                            <div class="dimm-details-table">
+                                <span class="label">Status</span>
+                                <span class="val" style="color:var(--muted);">Available for upgrade</span>
+                                <span class="label">Bank Locator</span>
+                                <span class="val">${esc(slot.bank || `Slot ${idx}`)}</span>
+                            </div>
+                            <div class="dimm-pins"></div>
+                        </div>
+                    `;
+                }
+            }).join("");
+        } else {
+            $("dimmSlotGrid").innerHTML = `
+                <div class="dimm-slot-card" style="grid-column: 1 / -1; padding: 20px;">
+                    <div class="dimm-header">
+                        <span class="dimm-locator">SYSTEM MAIN MEMORY</span>
+                        <span class="dimm-status-badge installed">${fmtBytes(m.total)} ONLINE</span>
+                    </div>
+                    <div style="font-size:13px; color:var(--text); margin-bottom: 8px;">
+                        Allocated Physical RAM: <b>${fmtBytes(m.total)}</b> (${fmtPct(m.percent)} In Use, ${fmtBytes(m.available)} Available)
+                    </div>
+                    <div style="font-size:11.5px; color:var(--muted);">
+                        Detailed DIMM slot topology and manufacturer part numbers are probed via SMBIOS tables (<code>dmidecode --type 17</code>). Run the WindyDash system daemon with root or sudoers privileges to render per-channel DIMM modules.
+                    </div>
+                    <div class="dimm-pins"></div>
+                </div>
+            `;
+        }
+    }
+
+    // Live Memory Performance Strip
     stats("memoryStats", [
-        ["Total", fmtBytes(m.total)],
-        ["Used", fmtBytes(m.used)],
-        ["Available", fmtBytes(m.available)],
-        ["Cached", fmtBytes(m.cached_bytes)],
-        ["Buffers", fmtBytes(m.buffers_bytes)],
-        ["Active", fmtBytes(m.active_bytes)],
-        ["Inactive", fmtBytes(m.inactive_bytes)],
-        ["Page tables", fmtBytes(m.page_tables_bytes)]
+        ["Total Physical", fmtBytes(m.total)],
+        ["Currently In-Use", fmtBytes(m.used)],
+        ["Available Memory", fmtBytes(m.available)],
+        ["Free Unallocated", fmtBytes(m.free)],
+        ["Cached Files", fmtBytes(m.cached_bytes)],
+        ["Kernel Buffers", fmtBytes(m.buffers_bytes)],
+        ["Swap In-Use", fmtBytes(m.swap_used)],
+        ["Swap Free", fmtBytes(m.swap_free)]
     ]);
     if ($("memPercent")) $("memPercent").textContent = fmtPct(m.percent);
+
+    // 1. Virtual Memory & Paging Subsystem
+    if ($("memVmStats")) {
+        $("memVmStats").innerHTML = [
+            ["Active User Memory", fmtBytes(m.active_bytes)],
+            ["Inactive Cache", fmtBytes(m.inactive_bytes)],
+            ["Page Tables Overhead", fmtBytes(m.page_tables_bytes)],
+            ["Shared Memory (tmpfs/shm)", fmtBytes(m.shmem_bytes)],
+            ["Memory Mapped Pages", fmtBytes(m.mapped_bytes)],
+            ["Swap Total Capacity", fmtBytes(m.swap_total)],
+            ["Swap Saturation", fmtPct(m.swap_percent)]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // 2. Kernel Caches & Slab Allocator
+    if ($("memKernelStats")) {
+        $("memKernelStats").innerHTML = [
+            ["Total Slab Allocator", fmtBytes(m.slab_bytes)],
+            ["Slab Reclaimable", fmtBytes(m.s_reclaimable_bytes)],
+            ["Slab Unreclaimable", fmtBytes(m.s_unreclaim_bytes)],
+            ["Kernel Buffers", fmtBytes(m.buffers_bytes)],
+            ["Page Cache", fmtBytes(m.cached_bytes)],
+            ["Kernel Memory Footprint", fmtBytes((m.slab_bytes || 0) + (m.page_tables_bytes || 0))]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // 3. Dirty Pages & Commit Limits
+    if ($("memCommitStats")) {
+        const commitPct = m.commit_limit_bytes ? ((m.committed_as_bytes || 0) / m.commit_limit_bytes) * 100 : 0;
+        $("memCommitStats").innerHTML = [
+            ["Dirty Pages (Unwritten)", fmtBytes(m.dirty_bytes)],
+            ["Writeback Queue (Flushing)", fmtBytes(m.writeback_bytes)],
+            ["Committed Memory (Allocated)", fmtBytes(m.committed_as_bytes)],
+            ["System Commit Limit", fmtBytes(m.commit_limit_bytes)],
+            ["Commit Ratio", fmtPct(commitPct)],
+            ["Free RAM Capacity", fmtBytes(m.free)]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // System Hero Header & Badges
+    if ($("sysFullModel")) {
+        const prettyOs = sysDet.pretty_name || s.os || "Linux System";
+        const hwModel = sysDet.hardware_model ? ` • ${sysDet.hardware_model}` : "";
+        $("sysFullModel").textContent = `${prettyOs}${hwModel}`;
+    }
+    if ($("sysTagDistro")) $("sysTagDistro").textContent = `${sysDet.distro_name || "Linux"} (${sysDet.id_like || "Standard"})`;
+    if ($("sysTagKernel")) $("sysTagKernel").textContent = `Kernel: ${s.kernel || sysDet.kernel || "Linux"}`;
+    if ($("sysTagArch")) $("sysTagArch").textContent = `${s.arch || "x86_64"} (64-bit)`;
+    if ($("sysTagHardware")) $("sysTagHardware").textContent = sysDet.hardware_model || "Host Platform";
+    if ($("sysTagInit")) $("sysTagInit").textContent = `Init: ${sysDet.init_system || "systemd"}`;
+    if ($("sysTagTz")) $("sysTagTz").textContent = sysDet.timezone ? `TZ: ${sysDet.timezone}` : "UTC";
 
     stats("systemStats", [
         ["Load 1m", Number(s.load1 || 0).toFixed(2)],
         ["Load 5m", Number(s.load5 || 0).toFixed(2)],
         ["Load 15m", Number(s.load15 || 0).toFixed(2)],
-        ["Processes", s.process_count],
-        ["Threads", s.thread_count],
-        ["Open files", s.open_files],
-        ["Kernel", s.kernel],
-        ["Architecture", s.arch]
+        ["Active Tasks", s.process_count],
+        ["Total Threads", s.thread_count],
+        ["Open Files", s.open_files],
+        ["C Library", sysDet.libc || "glibc"],
+        ["Timezone", sysDet.timezone || "UTC"]
     ]);
+
+    // 1. Distribution & Platform Specs
+    if ($("sysDistroStats")) {
+        $("sysDistroStats").innerHTML = [
+            ["Distribution", sysDet.pretty_name || s.os || "Linux"],
+            ["Base ID", sysDet.distro_name || "Linux"],
+            ["Release Version", sysDet.distro_version || "Standard"],
+            ["Version Codename", sysDet.codename || "N/A"],
+            ["Distribution Family", sysDet.id_like || "Independent"],
+            ["Init Daemon", sysDet.init_system || "systemd"],
+            ["Python Engine", s.python || "Python 3"]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // 2. Kernel & Toolchain
+    if ($("sysKernelStats")) {
+        $("sysKernelStats").innerHTML = [
+            ["Kernel Release", s.kernel || sysDet.kernel || "Generic"],
+            ["Kernel Build", sysDet.kernel_version || "Linux SMP"],
+            ["CPU Architecture", s.arch || "x86_64"],
+            ["C Runtime Library", sysDet.libc || "glibc"],
+            ["System Hostname", s.hostname || "localhost"],
+            ["Processor Model", c.model || "Generic CPU"]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
+
+    // 3. Hardware & Identity
+    if ($("sysIdentityStats")) {
+        $("sysIdentityStats").innerHTML = [
+            ["Hardware Product", sysDet.hardware_model || "Standard PC"],
+            ["Boot Timestamp", s.boot_time || "N/A"],
+            ["Operating Uptime", s.uptime_human || "N/A"],
+            ["Active Processes", `${s.process_count || 0} tasks`],
+            ["System Threads", `${s.thread_count || 0} threads`],
+            ["System Timezone", sysDet.timezone || "UTC"]
+        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    }
 
     // Processes Tab update
     if (activeTab === "processes") {
@@ -479,6 +702,7 @@ function updateHardware(d) {
     }
 
     renderInterfaces(n.interfaces);
+    renderPhysicalDisks(d.physical_disks, d.filesystems);
     renderDisks(d.filesystems);
     renderSensors(d.sensors);
     renderGpu(d.gpu);
@@ -554,11 +778,151 @@ function renderInterfaces(x) {
     }).join("") || '<div class="empty">No active interfaces.</div>';
 }
 
-// --- Enhanced Disks with Visual Capacity Fill Bars ---
+// --- Physical Storage & NVMe Controller Architecture ---
+function renderPhysicalDisks(disks, filesystems) {
+    const list = disks || [];
+    const fsList = filesystems || [];
+
+    // Map mountpoints to filesystems for fast lookup
+    const fsMap = {};
+    fsList.forEach(f => {
+        if (f.device) fsMap[f.device] = f;
+        if (f.mountpoint) fsMap[f.mountpoint] = f;
+    });
+
+    // 1. Storage Hero Card
+    if ($("storageFullModel")) {
+        if (list.length > 0) {
+            const first = list[0];
+            const others = list.length > 1 ? ` (+${list.length - 1} more)` : "";
+            $("storageFullModel").textContent = `${first.model || first.name}${others}`;
+        } else {
+            $("storageFullModel").textContent = "Standard Storage Subsystem";
+        }
+    }
+
+    if ($("storageTagCapacity")) {
+        const totalBytes = list.reduce((acc, d) => acc + (d.size_bytes || 0), 0);
+        $("storageTagCapacity").textContent = totalBytes > 0 ? `${fmtBytes(totalBytes)} Total` : "Capacity Scan";
+    }
+
+    if ($("storageTagDisks")) {
+        $("storageTagDisks").textContent = `${list.length} ${list.length === 1 ? "Physical Drive" : "Physical Drives"}`;
+    }
+
+    if ($("storageTagMedia")) {
+        const hasNvme = list.some(d => d.is_nvme);
+        const hasSsd = list.some(d => d.is_ssd);
+        $("storageTagMedia").textContent = hasNvme ? "NVMe Solid State" : (hasSsd ? "SATA Solid State" : "Standard Block Storage");
+    }
+
+    if ($("storageTagBus")) {
+        const pcie = list.find(d => d.pcie_link);
+        $("storageTagBus").textContent = pcie ? pcie.pcie_link : (list[0] ? `${list[0].transport} Interface` : "System Bus");
+    }
+
+    if ($("storageTagTemp")) {
+        const withTemp = list.find(d => d.temp_c !== null && d.temp_c !== undefined);
+        if (withTemp) {
+            $("storageTagTemp").textContent = `${withTemp.temp_c.toFixed(1)} °C Controller`;
+        } else {
+            $("storageTagTemp").textContent = "Thermals Normal";
+        }
+    }
+
+    if ($("storageTagPartitions")) {
+        const totalParts = list.reduce((acc, d) => acc + (d.partitions ? d.partitions.length : 0), 0);
+        $("storageTagPartitions").textContent = `${totalParts} Partitions`;
+    }
+
+    if ($("physicalDiskCountBadge")) {
+        $("physicalDiskCountBadge").textContent = `${list.length} ${list.length === 1 ? "Block Device" : "Block Devices"}`;
+    }
+
+    // 2. Drive Cards Grid
+    const grid = $("physicalDiskGrid");
+    if (!grid) return;
+    if (list.length === 0) {
+        grid.innerHTML = '<div class="empty">No physical block devices detected.</div>';
+        return;
+    }
+
+    grid.innerHTML = list.map(d => {
+        let cardTypeClass = "hdd-card";
+        let mediaTag = "HDD";
+        if (d.is_nvme) {
+            cardTypeClass = "nvme-card";
+            mediaTag = "NVMe PCIe SSD";
+        } else if (d.is_ssd) {
+            cardTypeClass = "sata-ssd-card";
+            mediaTag = "SATA SSD";
+        }
+
+        let tempBadgeHtml = "";
+        if (d.temp_c !== null && d.temp_c !== undefined) {
+            let tempClass = "drive-temp-cool";
+            if (d.temp_c >= 70) tempClass = "drive-temp-hot";
+            else if (d.temp_c >= 55) tempClass = "drive-temp-warm";
+            tempBadgeHtml = `<span class="drive-temp-badge ${tempClass}" title="Controller Thermals">${d.temp_c.toFixed(1)} °C</span>`;
+        }
+
+        const parts = d.partitions || [];
+        const partChips = parts.map(p => {
+            const hasMount = Boolean(p.mountpoint);
+            const label = hasMount ? `${esc(p.name)} [${esc(p.mountpoint)}]` : esc(p.name);
+            const sizeStr = p.size_bytes ? ` (${fmtBytes(p.size_bytes)})` : "";
+            return `<span class="partition-chip ${hasMount ? 'has-mount' : ''}" title="${esc(p.path)} ${sizeStr}">${label}</span>`;
+        }).join("");
+
+        return `
+            <div class="drive-card ${cardTypeClass}">
+                <div class="drive-card-header">
+                    <span class="drive-path-label">${esc(d.path)}</span>
+                    <div class="drive-badge-wrap">
+                        <span class="badge" style="color:var(--accent); font-weight:800;">${esc(mediaTag)}</span>
+                        ${tempBadgeHtml}
+                    </div>
+                </div>
+                <div class="drive-model-name">${esc(d.model || "Unknown Drive Model")}</div>
+                <div class="drive-media-desc">${esc(d.media_type || "Block Device")} • ${fmtBytes(d.size_bytes)}</div>
+                
+                <div class="drive-specs-grid">
+                    <span class="label">Physical Capacity</span>
+                    <span class="val">${fmtBytes(d.size_bytes)}</span>
+                    <span class="label">Transport Bus</span>
+                    <span class="val">${esc(d.transport)} ${d.pcie_link ? `(${esc(d.pcie_link)})` : ''}</span>
+                    <span class="label">Firmware Revision</span>
+                    <span class="val">${esc(d.firmware || "OEM Standard")}</span>
+                    <span class="label">Serial Number</span>
+                    <span class="val" title="${esc(d.serial)}">${esc(d.serial || "Not Specified")}</span>
+                    <span class="label">Solid State (SSD)</span>
+                    <span class="val" style="color:${d.is_ssd ? 'var(--accent2)' : 'var(--text)'};">${d.is_ssd ? 'Yes (Flash Media)' : 'No (Rotational Platter)'}</span>
+                </div>
+
+                ${parts.length > 0 ? `
+                    <div class="drive-partitions-title">Partition Table (${parts.length})</div>
+                    <div class="partition-chips">${partChips}</div>
+                ` : ''}
+            </div>
+        `;
+    }).join("");
+}
+
+// --- Enhanced Disks with Visual Capacity Fill Bars (Excludes virtual loop/snap devices) ---
 function renderDisks(x) {
     const el = $("filesystems");
     if (!el) return;
-    el.innerHTML = (x || []).map(v => {
+    const realDisks = (x || []).filter(v => {
+        const dev = (v.device || "").toLowerCase();
+        const fstype = (v.fstype || "").toLowerCase();
+        const mp = (v.mountpoint || "").toLowerCase();
+        return !dev.startsWith("/dev/loop") && 
+               !dev.startsWith("loop") && 
+               fstype !== "squashfs" && 
+               !mp.startsWith("/snap");
+    });
+
+    el.innerHTML = realDisks.map(v => {
         const pct = v.percent || 0;
         let barColor = "var(--accent2)";
         if (pct >= 85) barColor = "var(--danger)";
@@ -578,7 +942,7 @@ function renderDisks(x) {
                 <div class="disk-progress-fill" style="width: ${Math.min(pct, 100)}%; background: ${barColor};"></div>
             </div>
         </div>`;
-    }).join("") || '<div class="empty">No filesystems reported.</div>';
+    }).join("") || '<div class="empty">No physical filesystems reported.</div>';
 }
 
 function renderSensors(x) {

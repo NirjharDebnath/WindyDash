@@ -57,7 +57,8 @@ verify_syntax() {
 
 # --- 3. Generate Optimized Service Unit File ---
 generate_service_unit() {
-    echo -e "${C_CYAN}➤ Configuring ${SERVICE_NAME}...${C_RESET}"
+    SERVICE_USER="${WINDYDASH_USER:-root}"
+    echo -e "${C_CYAN}➤ Configuring ${SERVICE_NAME} (User: ${SERVICE_USER})...${C_RESET}"
     
     cat <<EOF > "${SCRIPT_DIR}/${SERVICE_NAME}"
 [Unit]
@@ -68,7 +69,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=${USER:-root}
+User=${SERVICE_USER}
 WorkingDirectory=${SCRIPT_DIR}
 ExecStart="${PYTHON_BIN}" sysmon.py
 Restart=always
@@ -93,6 +94,21 @@ EOF
 install_service() {
     verify_syntax
     generate_service_unit
+
+    SERVICE_USER="${WINDYDASH_USER:-root}"
+    if [ "${SERVICE_USER}" != "root" ]; then
+        echo -e "${C_CYAN}➤ Setting up passwordless dmidecode permissions for user ${SERVICE_USER}...${C_RESET}"
+        SUDOERS_FILE="/etc/sudoers.d/windydash"
+        SUDOERS_LINE="${SERVICE_USER} ALL=(ALL) NOPASSWD: /usr/sbin/dmidecode, /usr/bin/lshw"
+        if [ "$EUID" -ne 0 ]; then
+            echo "${SUDOERS_LINE}" | sudo tee "${SUDOERS_FILE}" > /dev/null
+            sudo chmod 0440 "${SUDOERS_FILE}"
+        else
+            echo "${SUDOERS_LINE}" > "${SUDOERS_FILE}"
+            chmod 0440 "${SUDOERS_FILE}"
+        fi
+        echo -e "${C_GREEN}✔ Sudoers permission drop-in configured at ${SUDOERS_FILE}${C_RESET}"
+    fi
 
     echo -e "${C_CYAN}➤ Installing service to ${SYSTEMD_DEST}...${C_RESET}"
     if [ "$EUID" -ne 0 ]; then

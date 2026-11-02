@@ -191,28 +191,110 @@
 
     <!-- 3. Memory Tab -->
     <section class="tab-panel" id="memory">
+      <!-- Memory Hardware Architecture Hero Card -->
+      <article class="panel memory-hero-panel">
+        <div class="memory-hero-header">
+          <div class="memory-icon-chip">▦</div>
+          <div class="memory-hero-info">
+            <h2 id="memFullSummary">Detecting Memory Architecture...</h2>
+            <div class="memory-hero-subtags" id="memHeroTags">
+              <span class="mem-tag" id="memTagCapacity">—</span>
+              <span class="mem-tag" id="memTagSlots">—</span>
+              <span class="mem-tag" id="memTagTech">—</span>
+              <span class="mem-tag" id="memTagSpeed">—</span>
+              <span class="mem-tag" id="memTagChannels">—</span>
+              <span class="mem-tag tag-success" id="memTagECC">—</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Physical DIMM Slot Topology Grid -->
+      <article class="panel" style="margin-bottom: 20px;">
+        <div class="panel-title">
+          <div>
+            <h2>Physical DIMM Slot Topology</h2>
+            <p>Motherboard memory channels, module capacities, clock speeds, and hardware part numbers.</p>
+          </div>
+          <div class="header-actions">
+            <span id="dimmSlotCountBadge" class="badge">Scanning Slots...</span>
+          </div>
+        </div>
+        <div id="dimmSlotNotice" class="dimm-notice" style="display: none;"></div>
+        <div id="dimmSlotGrid" class="dimm-grid">
+          <div class="empty">Scanning physical memory topology...</div>
+        </div>
+      </article>
+
       <div class="grid two">
         <article class="panel">
           <div class="panel-title">
-            <div><h2>Memory Allocation</h2><p>Physical RAM division: Used, Available, Buffers & Cache.</p></div>
+            <div><h2>Memory Allocation Breakdown</h2><p>Physical RAM division: Used, Available, Buffers & Cache.</p></div>
             <span id="memPercent" class="badge">—</span>
           </div>
           <div class="chart-wrap"><canvas id="memoryChart"></canvas></div>
         </article>
         <article class="panel">
           <div class="panel-title">
-            <div><h2>Swap Space Utilization</h2><p>Paging activity when physical memory thresholds are reached.</p></div>
+            <div><h2>Swap Space Utilization</h2><p>Virtual swap paging activity when RAM reaches saturation.</p></div>
             <span class="live-pill">Live</span>
           </div>
           <div class="chart-wrap"><canvas id="swapChart"></canvas></div>
         </article>
       </div>
+
       <div class="stats-grid" id="memoryStats"></div>
+
+      <!-- Advanced Linux Kernel Memory Breakdown -->
+      <div class="grid three memory-details-grid">
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Virtual Memory & Paging</h3><p>Active user pages, inactive cache, and page tables.</p></div>
+            <span class="section-icon">📄</span>
+          </div>
+          <div class="kv" id="memVmStats"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Kernel Caches & Slab</h3><p>Kernel slab allocator, reclaimable objects, and buffers.</p></div>
+            <span class="section-icon">⚙</span>
+          </div>
+          <div class="kv" id="memKernelStats"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Dirty Pages & Commit Limits</h3><p>Modified memory writeback and commit thresholds.</p></div>
+            <span class="section-icon">💾</span>
+          </div>
+          <div class="kv" id="memCommitStats"></div>
+        </article>
+      </div>
     </section>
 
     <!-- 4. System Tab -->
     <section class="tab-panel" id="system">
+      <!-- System & OS Hero Header Card -->
+      <article class="panel system-hero-panel">
+        <div class="system-hero-header">
+          <div class="system-icon-chip">🐧</div>
+          <div class="system-hero-info">
+            <h2 id="sysFullModel">Detecting Operating System...</h2>
+            <div class="system-hero-subtags" id="sysHeroTags">
+              <span class="system-tag" id="sysTagDistro">—</span>
+              <span class="system-tag" id="sysTagKernel">—</span>
+              <span class="system-tag" id="sysTagArch">—</span>
+              <span class="system-tag" id="sysTagHardware">—</span>
+              <span class="system-tag tag-success" id="sysTagInit">—</span>
+              <span class="system-tag" id="sysTagTz">—</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
       <div class="stats-grid" id="systemStats"></div>
+
       <div class="grid two">
         <article class="panel">
           <div class="panel-title">
@@ -224,8 +306,36 @@
         <article class="panel">
           <div class="panel-title">
             <div><h2>Operating Runtime</h2><p>Kernel specifications, system architecture, and runtime stats.</p></div>
+            <span class="live-pill">Live</span>
           </div>
           <div id="systemInfo" class="kv"></div>
+        </article>
+      </div>
+
+      <!-- Detailed OS & Environment Grid -->
+      <div class="grid three system-details-grid">
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Distribution & Platform</h3><p>OS release, version codename, and upstream base.</p></div>
+            <span class="section-icon">📦</span>
+          </div>
+          <div class="kv" id="sysDistroStats"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Kernel & Toolchain</h3><p>Linux kernel build, C standard library, and runtime.</p></div>
+            <span class="section-icon">⚙</span>
+          </div>
+          <div class="kv" id="sysKernelStats"></div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading">
+            <div><h3>Hardware & Identity</h3><p>Machine hardware product, network node, and timezone.</p></div>
+            <span class="section-icon">⌘</span>
+          </div>
+          <div class="kv" id="sysIdentityStats"></div>
         </article>
       </div>
     </section>
@@ -371,8 +481,42 @@
       </div>
     </section>
 
-    <!-- 7. Storage Tab (Enhanced with Visual Progress Bars) -->
+    <!-- 7. Storage Tab (Enhanced with NVMe & Physical Drive Topology) -->
     <section class="tab-panel" id="storage">
+      <!-- Storage Architecture & Controller Hero Card -->
+      <article class="panel storage-hero-panel">
+        <div class="storage-hero-header">
+          <div class="storage-icon-chip">🖴</div>
+          <div class="storage-hero-info">
+            <h2 id="storageFullModel">Detecting Storage Architecture...</h2>
+            <div class="storage-hero-subtags" id="storageHeroTags">
+              <span class="storage-tag" id="storageTagCapacity">—</span>
+              <span class="storage-tag" id="storageTagDisks">—</span>
+              <span class="storage-tag" id="storageTagMedia">—</span>
+              <span class="storage-tag" id="storageTagBus">—</span>
+              <span class="storage-tag tag-success" id="storageTagTemp">—</span>
+              <span class="storage-tag" id="storageTagPartitions">—</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Physical Drive & NVMe Subsystems Grid -->
+      <article class="panel" style="margin-bottom: 20px;">
+        <div class="panel-title">
+          <div>
+            <h2>Physical Block Devices & NVMe Subsystems</h2>
+            <p>Solid-state drives, PCIe bus link status, silicon firmware revisions, and real-time controller thermals.</p>
+          </div>
+          <div class="header-actions">
+            <span id="physicalDiskCountBadge" class="badge">Scanning Drives...</span>
+          </div>
+        </div>
+        <div id="physicalDiskGrid" class="drive-grid">
+          <div class="empty">Scanning physical block devices...</div>
+        </div>
+      </article>
+
       <div class="grid two">
         <article class="panel">
           <div class="panel-title">

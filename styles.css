@@ -1478,3 +1478,518 @@ footer {
 :root.light .flag-pill {
   background: #ede4d3;
 }
+
+/* ==============================================================================
+   MEMORY HERO BANNER & DIMM TOPOLOGY CARDS
+   ============================================================================== */
+.memory-hero-panel {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  border: 1px solid var(--border);
+}
+.memory-hero-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.memory-icon-chip {
+  width: 52px;
+  height: 52px;
+  background: var(--panel2);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  flex-shrink: 0;
+}
+:root.light .memory-icon-chip {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(194, 65, 12, 0.15);
+}
+.memory-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+.memory-hero-info h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.memory-hero-subtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mem-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.02em;
+}
+.mem-tag.tag-success {
+  color: var(--accent2);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+:root.light .mem-tag.tag-success {
+  color: var(--accent2);
+  border-color: rgba(21, 128, 61, 0.35);
+  background: rgba(21, 128, 61, 0.08);
+}
+
+.dimm-notice {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+:root.light .dimm-notice {
+  background: rgba(194, 65, 12, 0.06);
+  border-color: rgba(194, 65, 12, 0.25);
+}
+
+.dimm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.dimm-slot-card {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.dimm-slot-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.dimm-slot-card.occupied {
+  border-left: 4px solid var(--accent);
+}
+.dimm-slot-card.empty-slot {
+  border: 1px dashed var(--border);
+  opacity: 0.75;
+  background: transparent;
+}
+.dimm-slot-card.empty-slot:hover {
+  opacity: 1;
+  border-color: var(--muted);
+  transform: none;
+  box-shadow: none;
+}
+
+.dimm-pins {
+  height: 4px;
+  margin-top: 14px;
+  background: repeating-linear-gradient(
+    90deg,
+    #eab308 0px,
+    #eab308 3px,
+    transparent 3px,
+    transparent 5px
+  );
+  opacity: 0.85;
+  border-radius: 2px;
+}
+.dimm-slot-card.empty-slot .dimm-pins {
+  opacity: 0.2;
+}
+
+.dimm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.dimm-locator {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+.dimm-slot-card.empty-slot .dimm-locator {
+  color: var(--muted);
+}
+.dimm-status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dimm-status-badge.installed {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--accent2);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+:root.light .dimm-status-badge.installed {
+  color: #15803d;
+  background: rgba(21, 128, 61, 0.1);
+  border-color: rgba(21, 128, 61, 0.3);
+}
+.dimm-status-badge.empty {
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.dimm-main-spec {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dimm-capacity {
+  font-size: 24px;
+  font-weight: 850;
+  color: var(--text);
+  line-height: 1;
+}
+.dimm-speed-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.dimm-details-table {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.dimm-details-table .label {
+  color: var(--muted);
+  font-weight: 600;
+}
+.dimm-details-table .val {
+  color: var(--text);
+  font-weight: 700;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-details-grid {
+  margin-top: 20px;
+}
+
+/* ==============================================================================
+   STORAGE HERO BANNER & PHYSICAL NVME / SSD CARDS
+   ============================================================================== */
+.storage-hero-panel {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  border: 1px solid var(--border);
+}
+.storage-hero-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.storage-icon-chip {
+  width: 52px;
+  height: 52px;
+  background: var(--panel2);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  flex-shrink: 0;
+}
+:root.light .storage-icon-chip {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(194, 65, 12, 0.15);
+}
+.storage-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+.storage-hero-info h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.storage-hero-subtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.storage-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.02em;
+}
+.storage-tag.tag-success {
+  color: var(--accent2);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+:root.light .storage-tag.tag-success {
+  color: var(--accent2);
+  border-color: rgba(21, 128, 61, 0.35);
+  background: rgba(21, 128, 61, 0.08);
+}
+
+.drive-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.drive-card {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.drive-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.drive-card.nvme-card {
+  border-left: 4px solid var(--accent);
+}
+.drive-card.sata-ssd-card {
+  border-left: 4px solid #38bdf8;
+}
+.drive-card.hdd-card {
+  border-left: 4px solid var(--warn);
+}
+
+.drive-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.drive-path-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+.drive-badge-wrap {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.drive-temp-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.drive-temp-cool { color: var(--accent2); }
+.drive-temp-warm { color: var(--warn); }
+.drive-temp-hot { color: var(--danger); }
+
+.drive-model-name {
+  font-size: 16px;
+  font-weight: 850;
+  color: var(--text);
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drive-media-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.drive-specs-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-bottom: 14px;
+}
+.drive-specs-grid .label {
+  color: var(--muted);
+  font-weight: 600;
+}
+.drive-specs-grid .val {
+  color: var(--text);
+  font-weight: 700;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-partitions-title {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.partition-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.partition-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.partition-chip.has-mount {
+  border-color: rgba(34, 197, 94, 0.4);
+  color: var(--accent2);
+}
+:root.light .partition-chip.has-mount {
+  border-color: rgba(21, 128, 61, 0.4);
+  color: #15803d;
+}
+
+/* ==============================================================================
+   SYSTEM & OPERATING SYSTEM HERO BANNER
+   ============================================================================== */
+.system-hero-panel {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  border: 1px solid var(--border);
+}
+.system-hero-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.system-icon-chip {
+  width: 52px;
+  height: 52px;
+  background: var(--panel2);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  flex-shrink: 0;
+}
+:root.light .system-icon-chip {
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 8px rgba(194, 65, 12, 0.15);
+}
+.system-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+.system-hero-info h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.system-hero-subtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.system-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.02em;
+}
+.system-tag.tag-success {
+  color: var(--accent2);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.08);
+}
+:root.light .system-tag.tag-success {
+  color: var(--accent2);
+  border-color: rgba(21, 128, 61, 0.35);
+  background: rgba(21, 128, 61, 0.08);
+}
+
+.system-details-grid {
+  margin-top: 20px;
+}

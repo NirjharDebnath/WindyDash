@@ -6,7 +6,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=nirjhar
+User=root
 WorkingDirectory=/home/nirjhar/Python Codes/Einstein/WindyDash
 ExecStart="/home/nirjhar/Python Codes/Einstein/einsteinenv/bin/python" sysmon.py
 Restart=always
