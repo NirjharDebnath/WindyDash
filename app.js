@@ -92,38 +92,38 @@ function chart(id, label, datasets, unit = "") {
 let charts = {};
 
 function initCharts() {
-    charts.ovCpu = chart("overviewCpuChart", "CPU %", [{ label: "CPU", data: history.cpu, borderColor: "#f59e0b" }], "%");
-    charts.ovMem = chart("overviewMemChart", "Memory %", [{ label: "Memory", data: history.mem, borderColor: "#22c55e" }], "%");
+    charts.ovCpu = chart("overviewCpuChart", "CPU %", [{ label: "CPU", data: history.cpu, borderColor: "#df5a35" }], "%");
+    charts.ovMem = chart("overviewMemChart", "Memory %", [{ label: "Memory", data: history.mem, borderColor: "#5cd4a8" }], "%");
     
     const coreEl = $("coreChart");
     if (coreEl) {
         charts.core = new Chart(coreEl, {
             type: "bar",
-            data: { labels: [], datasets: [{ label: "Usage %", data: [], backgroundColor: "#f59e0b", borderRadius: 2 }] },
+            data: { labels: [], datasets: [{ label: "Usage %", data: [], backgroundColor: "#df5a35", borderRadius: 3 }] },
             options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { beginAtZero: true, max: 100 } } }
         });
     }
 
-    charts.freq = chart("freqChart", "MHz", [{ label: "Frequency", data: [], borderColor: "#fbbf24" }], "");
+    charts.freq = chart("freqChart", "MHz", [{ label: "Frequency", data: [], borderColor: "#f2b744" }], "");
     
     const memEl = $("memoryChart");
     if (memEl) {
         charts.memory = new Chart(memEl, {
             type: "doughnut",
-            data: { labels: ["Used", "Available"], datasets: [{ data: [0, 100], backgroundColor: ["#f59e0b", "#2b231b"], borderWidth: 0 }] },
+            data: { labels: ["Used", "Available"], datasets: [{ data: [0, 100], backgroundColor: ["#5cd4a8", "rgba(255, 255, 255, 0.08)"], borderWidth: 0 }] },
             options: { responsive: true, maintainAspectRatio: false, animation: false }
         });
     }
 
     charts.swap = chart("swapChart", "Swap %", [{ label: "Swap", data: history.swap, borderColor: "#ef4444" }], "%");
-    charts.load = chart("loadChart", "Load", [{ label: "1m", data: history.load, borderColor: "#f59e0b" }]);
+    charts.load = chart("loadChart", "Load", [{ label: "1m", data: history.load, borderColor: "#df5a35" }]);
     charts.net = chart("networkChart", "Network", [
-        { label: "RX", data: history.rx, borderColor: "#22c55e" },
-        { label: "TX", data: history.tx, borderColor: "#ea580c" }
+        { label: "RX", data: history.rx, borderColor: "#5cd4a8" },
+        { label: "TX", data: history.tx, borderColor: "#f2b744" }
     ], "");
     charts.disk = chart("diskChart", "Disk", [
-        { label: "Read", data: history.read, borderColor: "#22c55e" },
-        { label: "Write", data: history.write, borderColor: "#f59e0b" }
+        { label: "Read", data: history.read, borderColor: "#5cd4a8" },
+        { label: "Write", data: history.write, borderColor: "#df5a35" }
     ], "");
 }
 

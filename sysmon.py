@@ -146,6 +146,13 @@ async def get_favicon():
     svg_icon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍁</text></svg>'
     return Response(content=svg_icon, media_type="image/svg+xml")
 
+@app.get("/background.jpg")
+async def get_background():
+    bg_path = BASE_DIR / "background.jpg"
+    if bg_path.exists():
+        return FileResponse(bg_path, media_type="image/jpeg")
+    return Response(status_code=404)
+
 # --- Authentication & Session APIs ---
 
 class LoginRequest(BaseModel):

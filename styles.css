@@ -1,50 +1,54 @@
 /**
- * WindyDash - Vintage Analog & Amber Phosphor Theme
- * Inspired by vintage laboratory instrumentation, analog oscilloscopes,
- * DEC VT-series terminals, and classic Olivetti mechanical design.
- * Features tactile mechanical switches, glowing pilot jewel lamps, and warm typography.
+ * WindyDash - Autumn Maple & Ronin Slate Theme
+ * Inspired by Kaedehara Kazuha (Autumn Wind, Maple Leaves, Anemo Jade, and Ronin Slate).
+ * Features glassmorphic translucent panels, vivid maple crimson accents,
+ * glowing anemo indicators, and atmospheric fixed artwork integration.
  */
 
 :root {
-  /* Vintage Dark: "Amber Phosphor Cathode & Bakelite Console" */
-  --bg: #100e0b;
-  --panel: #181410;
-  --panel2: #211b15;
-  --panel-hover: #2b231b;
-  --text: #faeedb;
-  --muted: #a3927d;
-  --border: #3a2e22;
-  --border-focus: #f59e0b;
-  --accent: #f59e0b;           /* Amber Phosphor CRT */
-  --accent-light: #fbbf24;
-  --accent2: #22c55e;          /* Green Phosphor Indicator */
-  --danger: #ef4444;           /* Ruby Warning Lamp */
-  --warn: #ea580c;             /* Vacuum Tube Filament */
-  --shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(245, 158, 11, 0.08);
+  /* Autumn Dark: "Ronin Slate, Maple Crimson & Luminous Anemo" */
+  --bg: #121310;
+  --bg-gradient: linear-gradient(135deg, rgba(16, 17, 14, 0.86) 0%, rgba(22, 23, 19, 0.76) 50%, rgba(13, 14, 11, 0.88) 100%);
+  --panel: rgba(24, 25, 21, 0.78);
+  --panel2: rgba(33, 34, 29, 0.84);
+  --panel-hover: rgba(44, 46, 39, 0.92);
+  --text: #f7f1e6;             /* Platinum Cream (Kazuha hair & robes) */
+  --muted: #a39e91;            /* Warm weathered stone */
+  --border: rgba(223, 90, 53, 0.24); /* Autumn Maple Crimson border */
+  --border-focus: #df5a35;
+  --accent: #df5a35;           /* Autumn Maple Crimson */
+  --accent-light: #f2724f;     /* Bright Maple Leaf */
+  --accent2: #5cd4a8;          /* Luminous Anemo Mint / Wind Breeze */
+  --danger: #ef4444;           /* Crimson seal */
+  --warn: #f2b744;             /* Golden Maple Leaf */
+  --shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(223, 90, 53, 0.14);
   --btn-shadow: 0 3px 0 #000, 0 4px 10px rgba(0, 0, 0, 0.5);
-  --glow: 0 0 12px rgba(245, 158, 11, 0.28);
-  --card-radius: 10px;
-  --transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --glow: 0 0 14px rgba(223, 90, 53, 0.35);
+  --card-radius: 12px;
+  --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --glass-blur: blur(14px);
+  --glass-sat: saturate(130%);
 }
 
 :root.light {
-  /* Vintage Light: "Archival Technical Manual & Olivetti Typewriter" */
-  --bg: #f4efe4;
-  --panel: #fcf9f2;
-  --panel2: #eee6d6;
-  --panel-hover: #e5dbc7;
-  --text: #26211a;             /* Soot Typewriter Ribbon */
-  --muted: #756a59;            /* Faded Carbon Ink */
-  --border: #d7cbba;           /* Engraved Blueprint Rule */
+  /* Autumn Light: "Rice Paper, Terracotta Maple & Jade Wind" */
+  --bg: #f7f3ea;
+  --bg-gradient: linear-gradient(135deg, rgba(252, 250, 245, 0.88) 0%, rgba(245, 239, 228, 0.82) 50%, rgba(250, 246, 238, 0.92) 100%);
+  --panel: rgba(255, 253, 248, 0.84);
+  --panel2: rgba(245, 240, 230, 0.90);
+  --panel-hover: rgba(238, 231, 218, 0.96);
+  --text: #2c251f;             /* Dark sumi ink */
+  --muted: #7c7263;            /* Warm charcoal wash */
+  --border: rgba(194, 65, 12, 0.20);
   --border-focus: #c2410c;
-  --accent: #c2410c;           /* Terracotta / Burnt Orange */
-  --accent-light: #ea580c;
-  --accent2: #15803d;          /* Vintage Forest Green */
-  --danger: #b91c1c;           /* Stamp Red */
-  --warn: #d97706;             /* Amber Seal */
-  --shadow: 0 6px 18px -4px rgba(60, 45, 30, 0.12), 0 0 0 1px rgba(120, 90, 60, 0.15);
+  --accent: #c2410c;           /* Terracotta Maple */
+  --accent-light: #df5a35;
+  --accent2: #15803d;          /* Jade Wind */
+  --danger: #b91c1c;
+  --warn: #d97706;
+  --shadow: 0 8px 24px -4px rgba(60, 45, 30, 0.12), 0 0 0 1px rgba(194, 65, 12, 0.15);
   --btn-shadow: 0 2px 0 #b3a490, 0 3px 6px rgba(0, 0, 0, 0.08);
-  --glow: 0 0 8px rgba(194, 65, 12, 0.18);
+  --glow: 0 0 10px rgba(194, 65, 12, 0.22);
 }
 
 * {
@@ -54,11 +58,11 @@
 body {
   margin: 0;
   background-color: var(--bg);
-  /* Subtle vintage CRT scanline and warm cathode vignette */
-  background-image: 
-    radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.035) 0%, transparent 70%),
-    linear-gradient(rgba(16, 14, 11, 0) 50%, rgba(0, 0, 0, 0.18) 50%);
-  background-size: 100% 100%, 100% 4px;
+  background-image: var(--bg-gradient), url('/background.jpg');
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", "Courier Prime", Menlo, Consolas, monospace;
   font-size: 13.5px;
@@ -69,8 +73,11 @@ body {
 }
 
 :root.light body {
-  background-image: radial-gradient(circle at 50% 0%, rgba(194, 65, 12, 0.025) 0%, transparent 60%);
-  background-size: 100% 100%;
+  background-image: var(--bg-gradient), url('/background.jpg');
+  background-position: center center;
+  background-size: cover;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 /* Custom Vintage Scrollbar */
@@ -124,21 +131,21 @@ body {
   letter-spacing: -0.02em;
   text-transform: uppercase;
   color: var(--text);
-  text-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+  text-shadow: 0 0 12px rgba(223, 90, 53, 0.25);
 }
 
 .brand-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
-  background: white;
-  color: #120f0c;
-  font-size: 18px;
+  background: linear-gradient(135deg, #df5a35 0%, #b83d1c 100%);
+  color: #ffffff;
+  font-size: 20px;
   font-weight: 900;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 6px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(223, 90, 53, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .version-tag {
@@ -248,19 +255,23 @@ body {
   box-shadow: 0 1px 0 #000;
 }
 
-/* Vintage Sticky Navigation Tabs */
+/* Sticky Navigation Tabs */
 .tabs {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(18, 19, 16, 0.85);
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
   border-bottom: 2px solid var(--border);
   display: flex;
   gap: 2px;
   padding: 0 32px;
   overflow-x: auto;
+}
+
+:root.light .tabs {
+  background: rgba(247, 243, 234, 0.88);
 }
 
 .tab {
@@ -284,13 +295,14 @@ body {
 
 .tab:hover {
   color: var(--text);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .tab.active {
   color: var(--accent);
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: inset 0 -2px 0 var(--accent), 0 2px 12px rgba(223, 90, 53, 0.2);
 }
 
 /* Main Container */
@@ -334,24 +346,25 @@ main {
   box-shadow: var(--shadow);
   transition: var(--transition);
   position: relative;
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+  overflow: hidden;
 }
 
-/* Retro metallic screws/rivets on card corners */
+/* Elegant top highlight edge with subtle maple crimson glow */
 .metric-card::before, .panel::before {
-  content: "•";
+  content: "";
   position: absolute;
-  top: 4px;
-  left: 6px;
-  color: var(--border);
-  font-size: 11px;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(223, 90, 53, 0.4), transparent);
+  pointer-events: none;
 }
 .metric-card::after, .panel::after {
-  content: "•";
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  color: var(--border);
-  font-size: 11px;
+  content: "";
+  display: none;
 }
 
 .metric-card {
@@ -389,7 +402,7 @@ main {
   margin: 8px 0 2px;
   letter-spacing: -0.03em;
   color: var(--accent);
-  text-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+  text-shadow: 0 0 14px rgba(223, 90, 53, 0.28);
 }
 
 .metric-card small {
@@ -398,7 +411,9 @@ main {
 }
 
 .metric-card:hover, .panel:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.8), 0 0 16px rgba(223, 90, 53, 0.20);
+  transform: translateY(-2px);
 }
 
 /* Grids & Panels */
@@ -572,13 +587,13 @@ main {
   font-weight: 800;
 }
 
-/* Analog Segmented Progress Bar */
+/* Sleek Progress Bar with Maple Glow */
 .disk-progress-bar {
   width: 100%;
   height: 7px;
-  background: var(--panel);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
   margin-top: 8px;
   overflow: hidden;
   grid-column: 1 / -1;
@@ -587,14 +602,9 @@ main {
 
 .disk-progress-fill {
   height: 100%;
-  border-radius: 2px;
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--accent),
-    var(--accent) 4px,
-    color-mix(in srgb, var(--accent) 70%, #000) 4px,
-    color-mix(in srgb, var(--accent) 70%, #000) 8px
-  );
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
+  box-shadow: 0 0 8px rgba(223, 90, 53, 0.4);
   transition: width 0.3s ease;
 }
 
@@ -1149,29 +1159,31 @@ footer {
 }
 
 .terminal-bezel {
-  background: #15110d;
-  border: 2px solid #4a3b2c;
-  border-radius: 12px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(245, 158, 11, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+  background: rgba(22, 23, 19, 0.94);
+  border: 2px solid rgba(223, 90, 53, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 20px rgba(223, 90, 53, 0.22);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   overflow: hidden;
 }
 :root.light .terminal-bezel {
-  background: #eae2d3;
-  border: 2px solid #b3a28c;
-  box-shadow: 0 15px 40px rgba(60, 45, 30, 0.25), 0 0 0 1px rgba(194, 65, 12, 0.2);
+  background: rgba(250, 246, 238, 0.96);
+  border: 2px solid rgba(194, 65, 12, 0.25);
+  box-shadow: 0 20px 45px rgba(60, 45, 30, 0.25), 0 0 16px rgba(194, 65, 12, 0.15);
 }
 
 .terminal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  background: #1e1913;
-  border-bottom: 2px solid #3d2f21;
+  padding: 12px 18px;
+  background: rgba(29, 31, 25, 0.96);
+  border-bottom: 2px solid rgba(223, 90, 53, 0.25);
 }
 :root.light .terminal-header {
-  background: #dfd4c1;
-  border-bottom: 2px solid #c9bca6;
+  background: #eae2d3;
+  border-bottom: 2px solid rgba(194, 65, 12, 0.20);
 }
 
 .terminal-lamps {
@@ -1189,12 +1201,12 @@ footer {
   box-shadow: 0 0 6px #ef4444;
 }
 .lamp-amber {
-  background: #f59e0b;
-  box-shadow: 0 0 6px #f59e0b;
+  background: var(--warn);
+  box-shadow: 0 0 6px var(--warn);
 }
 .lamp-green {
-  background: #22c55e;
-  box-shadow: 0 0 6px #22c55e;
+  background: var(--accent2);
+  box-shadow: 0 0 6px var(--accent2);
 }
 
 .terminal-title {
@@ -1216,11 +1228,11 @@ footer {
 
 .terminal-screen {
   padding: 24px;
-  background: #0d0b09;
+  background: rgba(14, 15, 12, 0.95);
   position: relative;
 }
 :root.light .terminal-screen {
-  background: #fcf9f2;
+  background: #fcfaf5;
 }
 
 .terminal-banner {
@@ -1232,7 +1244,7 @@ footer {
   font-size: 9.5px;
   line-height: 1.15;
   color: var(--accent);
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  text-shadow: 0 0 10px rgba(223, 90, 53, 0.4);
   margin: 0 0 10px;
 }
 :root.light .terminal-ascii {
@@ -1267,9 +1279,9 @@ footer {
   border: 1px solid rgba(220, 38, 38, 0.3);
 }
 .auth-alert.success {
-  background: rgba(34, 197, 94, 0.14);
-  color: #86efac;
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: rgba(92, 212, 168, 0.14);
+  color: #a7f3d0;
+  border: 1px solid rgba(92, 212, 168, 0.4);
 }
 :root.light .auth-alert.success {
   background: rgba(21, 128, 61, 0.1);
@@ -1296,7 +1308,7 @@ footer {
 .input-glow-wrap {
   display: flex;
   align-items: center;
-  background: #16120d;
+  background: var(--panel2);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 2px 10px;
@@ -1308,7 +1320,7 @@ footer {
 }
 .input-glow-wrap:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 12px rgba(223, 90, 53, 0.25);
 }
 :root.light .input-glow-wrap:focus-within {
   box-shadow: 0 0 8px rgba(194, 65, 12, 0.2);
@@ -1388,8 +1400,23 @@ footer {
 .cpu-hero-panel {
   margin-bottom: 20px;
   padding: 20px 24px;
-  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+  position: relative;
+  overflow: hidden;
+}
+.cpu-hero-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(223, 90, 53, 0.4), transparent);
+  pointer-events: none;
 }
 .cpu-hero-header {
   display: flex;
@@ -1401,13 +1428,13 @@ footer {
   height: 52px;
   background: var(--panel2);
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 14px rgba(223, 90, 53, 0.28);
   flex-shrink: 0;
 }
 :root.light .cpu-icon-chip {
@@ -1446,8 +1473,8 @@ footer {
 }
 .cpu-tag.tag-success {
   color: var(--accent2);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(92, 212, 168, 0.35);
+  background: rgba(92, 212, 168, 0.08);
 }
 :root.light .cpu-tag.tag-success {
   color: var(--accent2);
@@ -1485,8 +1512,23 @@ footer {
 .memory-hero-panel {
   margin-bottom: 20px;
   padding: 20px 24px;
-  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+  position: relative;
+  overflow: hidden;
+}
+.memory-hero-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(223, 90, 53, 0.4), transparent);
+  pointer-events: none;
 }
 .memory-hero-header {
   display: flex;
@@ -1498,13 +1540,13 @@ footer {
   height: 52px;
   background: var(--panel2);
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 14px rgba(223, 90, 53, 0.28);
   flex-shrink: 0;
 }
 :root.light .memory-icon-chip {
@@ -1543,8 +1585,8 @@ footer {
 }
 .mem-tag.tag-success {
   color: var(--accent2);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(92, 212, 168, 0.35);
+  background: rgba(92, 212, 168, 0.08);
 }
 :root.light .mem-tag.tag-success {
   color: var(--accent2);
@@ -1556,8 +1598,8 @@ footer {
   margin-bottom: 16px;
   padding: 12px 16px;
   border-radius: 6px;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(223, 90, 53, 0.08);
+  border: 1px solid rgba(223, 90, 53, 0.3);
   color: var(--accent);
   font-size: 12px;
   line-height: 1.5;
@@ -1579,18 +1621,20 @@ footer {
 .dimm-slot-card {
   background: var(--panel2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
   transition: var(--transition);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 .dimm-slot-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 12px rgba(223, 90, 53, 0.2);
 }
 .dimm-slot-card.occupied {
   border-left: 4px solid var(--accent);
@@ -1612,12 +1656,12 @@ footer {
   margin-top: 14px;
   background: repeating-linear-gradient(
     90deg,
-    #eab308 0px,
-    #eab308 3px,
+    #f2b744 0px,
+    #f2b744 3px,
     transparent 3px,
     transparent 5px
   );
-  opacity: 0.85;
+  opacity: 0.9;
   border-radius: 2px;
 }
 .dimm-slot-card.empty-slot .dimm-pins {
@@ -1649,9 +1693,9 @@ footer {
   text-transform: uppercase;
 }
 .dimm-status-badge.installed {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(92, 212, 168, 0.12);
   color: var(--accent2);
-  border: 1px solid rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(92, 212, 168, 0.35);
 }
 :root.light .dimm-status-badge.installed {
   color: #15803d;
@@ -1717,8 +1761,23 @@ footer {
 .storage-hero-panel {
   margin-bottom: 20px;
   padding: 20px 24px;
-  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+  position: relative;
+  overflow: hidden;
+}
+.storage-hero-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(223, 90, 53, 0.4), transparent);
+  pointer-events: none;
 }
 .storage-hero-header {
   display: flex;
@@ -1730,13 +1789,13 @@ footer {
   height: 52px;
   background: var(--panel2);
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 14px rgba(223, 90, 53, 0.28);
   flex-shrink: 0;
 }
 :root.light .storage-icon-chip {
@@ -1775,8 +1834,8 @@ footer {
 }
 .storage-tag.tag-success {
   color: var(--accent2);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(92, 212, 168, 0.35);
+  background: rgba(92, 212, 168, 0.08);
 }
 :root.light .storage-tag.tag-success {
   color: var(--accent2);
@@ -1793,18 +1852,20 @@ footer {
 .drive-card {
   background: var(--panel2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 18px;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
   transition: var(--transition);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 .drive-card:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 12px rgba(223, 90, 53, 0.2);
 }
 .drive-card.nvme-card {
   border-left: 4px solid var(--accent);
@@ -1909,7 +1970,7 @@ footer {
   gap: 4px;
 }
 .partition-chip.has-mount {
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: rgba(92, 212, 168, 0.4);
   color: var(--accent2);
 }
 :root.light .partition-chip.has-mount {
@@ -1923,8 +1984,23 @@ footer {
 .system-hero-panel {
   margin-bottom: 20px;
   padding: 20px 24px;
-  background: linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%);
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  backdrop-filter: var(--glass-blur) var(--glass-sat);
+  -webkit-backdrop-filter: var(--glass-blur) var(--glass-sat);
+  position: relative;
+  overflow: hidden;
+}
+.system-hero-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(223, 90, 53, 0.4), transparent);
+  pointer-events: none;
 }
 .system-hero-header {
   display: flex;
@@ -1936,13 +2012,13 @@ footer {
   height: 52px;
   background: var(--panel2);
   border: 2px solid var(--accent);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 14px rgba(223, 90, 53, 0.28);
   flex-shrink: 0;
 }
 :root.light .system-icon-chip {
@@ -1981,8 +2057,8 @@ footer {
 }
 .system-tag.tag-success {
   color: var(--accent2);
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(92, 212, 168, 0.35);
+  background: rgba(92, 212, 168, 0.08);
 }
 :root.light .system-tag.tag-success {
   color: var(--accent2);
