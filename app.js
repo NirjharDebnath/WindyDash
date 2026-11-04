@@ -348,6 +348,7 @@ function getOsIconSvg(sysDet, s, size = 30) {
 function updateHardware(d) {
     latest = d;
     const c = d.cpu || {}, m = d.memory || {}, s = d.system || {}, n = d.network || {}, disk = d.disk || {};
+    const sysDet = s.details || {};
 
     push(history.cpu, c.global_percent);
     push(history.mem, m.percent);
@@ -420,7 +421,6 @@ function updateHardware(d) {
             ["Uptime", esc(s.uptime_human)]
         ].map(x => `<div>${x[0]}</div><div>${x[1]}</div>`).join("");
     }
-    const sysDet = s.details || {};
     if ($("systemInfo")) {
         $("systemInfo").innerHTML = [
             ["OS Distribution", s.os],
