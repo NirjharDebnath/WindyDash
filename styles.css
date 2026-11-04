@@ -58,7 +58,12 @@
 body {
   margin: 0;
   background-color: var(--bg);
-  background-image: var(--bg-gradient), url('/background.jpg');
+  /* Atmospheric background without image (background.jpg disabled to test falling leaves on clean UI) */
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(223, 90, 53, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(92, 212, 168, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(245, 183, 68, 0.05) 0%, transparent 55%),
+    var(--bg-gradient);
   background-position: center center;
   background-size: cover;
   background-attachment: fixed;
@@ -70,14 +75,37 @@ body {
   letter-spacing: -0.015em;
   transition: background 0.25s ease, color 0.25s ease;
   min-height: 100vh;
+  position: relative;
 }
 
 :root.light body {
-  background-image: var(--bg-gradient), url('/background.jpg');
+  /* Light mode atmospheric background */
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(194, 65, 12, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(21, 128, 61, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(217, 119, 6, 0.05) 0%, transparent 55%),
+    var(--bg-gradient);
   background-position: center center;
   background-size: cover;
   background-attachment: fixed;
   background-repeat: no-repeat;
+}
+
+/* Maple Leaves Particle Canvas */
+#maple-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Stacking context: Keep all telemetry controls, cards, and tabs cleanly interactive above the background canvas */
+.topbar, .tabs, main, footer, .modal-backdrop {
+  position: relative;
+  z-index: 2;
 }
 
 /* Custom Vintage Scrollbar */
@@ -2080,3 +2108,235 @@ footer {
 .system-details-grid {
   margin-top: 20px;
 }
+
+/* ==========================================================================
+   TELEMETRY CHANNEL HOLD & MASTER FREEZE CONTROLS
+   Minimalist Laboratory-Grade Instrumentation Controls
+   ========================================================================== */
+
+/* Master Live/Hold Telemetry Pill Button */
+.pause-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(92, 212, 168, 0.12);
+  border: 1px solid rgba(92, 212, 168, 0.35);
+  color: var(--accent2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+.pause-pill-btn:hover {
+  background: rgba(92, 212, 168, 0.22);
+  border-color: var(--accent2);
+  transform: translateY(-1px);
+}
+.pause-pill-btn:active {
+  transform: translateY(1px);
+}
+.pause-status-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent2);
+  box-shadow: 0 0 8px var(--accent2);
+  animation: filament-pulse 2s infinite ease-in-out;
+}
+
+/* Paused / Frozen State */
+.pause-pill-btn.is-paused {
+  background: rgba(223, 90, 53, 0.22);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(223, 90, 53, 0.35);
+}
+.pause-pill-btn.is-paused .pause-status-led {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: none;
+}
+
+/* Partial Hold State (Selective Channels on Hold) */
+.pause-pill-btn.is-partial {
+  background: rgba(242, 183, 68, 0.18);
+  border-color: #f2b744;
+  color: #f2b744;
+  box-shadow: 0 0 10px rgba(242, 183, 68, 0.3);
+}
+.pause-pill-btn.is-partial .pause-status-led {
+  background: #f2b744;
+  box-shadow: 0 0 8px #f2b744;
+  animation: filament-pulse 1.2s infinite ease-in-out;
+}
+
+/* Telemetry Channel Hold Drawer (Floating Glass Tray) */
+.pause-drawer {
+  position: fixed;
+  top: 76px;
+  right: 32px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(223, 90, 53, 0.16);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideDownFade 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pause-drawer-header {
+  padding: 16px 20px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(229, 169, 83, 0.12);
+}
+
+.pause-drawer-title h3 {
+  margin: 3px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.pause-drawer-body {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.pause-channel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pause-channel-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(229, 169, 83, 0.18);
+}
+
+.pause-channel-row.is-paused {
+  border-color: rgba(223, 90, 53, 0.4);
+  background: rgba(223, 90, 53, 0.09);
+}
+
+.master-channel-row {
+  background: rgba(223, 90, 53, 0.1);
+  border-color: rgba(223, 90, 53, 0.28);
+}
+
+.pause-channel-divider {
+  height: 1px;
+  background: rgba(229, 169, 83, 0.14);
+  margin: 3px 0;
+}
+
+.channel-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.channel-icon {
+  font-size: 15px;
+  width: 22px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.channel-title {
+  font-size: 12.5px;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.channel-desc {
+  font-size: 10.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Channel Toggle Switch Buttons */
+.channel-toggle-btn {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 11px;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid rgba(92, 212, 168, 0.4);
+  background: rgba(92, 212, 168, 0.12);
+  color: var(--accent2);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.channel-toggle-btn:hover {
+  background: rgba(92, 212, 168, 0.25);
+  border-color: var(--accent2);
+}
+.channel-toggle-btn.is-held {
+  border-color: rgba(223, 90, 53, 0.6);
+  background: rgba(223, 90, 53, 0.22);
+  color: var(--accent);
+}
+
+.pause-drawer-footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(229, 169, 83, 0.12);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.tiny-icon-btn {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+@media (max-width: 768px) {
+  .pause-drawer {
+    right: 16px;
+    left: 16px;
+    width: auto;
+    top: 68px;
+  }
+}
+

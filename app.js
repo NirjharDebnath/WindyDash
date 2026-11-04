@@ -135,34 +135,43 @@ function updateChart(c) {
 
 function refreshActiveTabCharts() {
     if (document.hidden) return;
+    const allChannels = ["cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"];
+    const allHeld = allChannels.every(c => pauseState[c]);
+
     if (activeTab === "overview") {
-        updateChart(charts.ovCpu);
-        updateChart(charts.ovMem);
+        if (!pauseState.overview && !pauseState.cpu) updateChart(charts.ovCpu);
+        if (!pauseState.overview && !pauseState.mem) updateChart(charts.ovMem);
     } else if (activeTab === "processor" && latest) {
-        const c = latest.cpu || {};
-        if (charts.core) {
-            charts.core.data.labels = (c.per_core_percent || []).map((_, i) => `C${i}`);
-            charts.core.data.datasets[0].data = c.per_core_percent || [];
-            charts.core.update("none");
-        }
-        if (charts.freq) {
-            charts.freq.data.labels = (c.per_core_freq_mhz || []).map((_, i) => `C${i}`);
-            charts.freq.data.datasets[0].data = c.per_core_freq_mhz || [];
-            charts.freq.update("none");
+        if (!pauseState.cpu) {
+            const c = latest.cpu || {};
+            if (charts.core) {
+                charts.core.data.labels = (c.per_core_percent || []).map((_, i) => `C${i}`);
+                charts.core.data.datasets[0].data = c.per_core_percent || [];
+                charts.core.update("none");
+            }
+            if (charts.freq) {
+                charts.freq.data.labels = (c.per_core_freq_mhz || []).map((_, i) => `C${i}`);
+                charts.freq.data.datasets[0].data = c.per_core_freq_mhz || [];
+                charts.freq.update("none");
+            }
+            updateChart(charts.cpu);
         }
     } else if (activeTab === "memory" && latest) {
-        const m = latest.memory || {};
-        if (charts.memory) {
-            charts.memory.data.datasets[0].data = [m.used || 0, m.available || 0];
-            charts.memory.update("none");
+        if (!pauseState.mem) {
+            const m = latest.memory || {};
+            if (charts.memory) {
+                charts.memory.data.datasets[0].data = [m.used || 0, m.available || 0];
+                charts.memory.update("none");
+            }
+            updateChart(charts.swap);
+            updateChart(charts.mem);
         }
-        updateChart(charts.swap);
     } else if (activeTab === "system") {
-        updateChart(charts.load);
+        if (!pauseState.system && !allHeld) updateChart(charts.load);
     } else if (activeTab === "network") {
-        updateChart(charts.net);
+        if (!pauseState.net) updateChart(charts.net);
     } else if (activeTab === "storage") {
-        updateChart(charts.disk);
+        if (!pauseState.disk) updateChart(charts.disk);
     }
 }
 
@@ -174,6 +183,9 @@ function updateThemeVisuals() {
         $("themeIcon").textContent = isLight ? "☾" : "☼";
     }
     Object.values(charts).forEach(c => { if (c) c.update("none"); });
+    if (window.drawBackgroundSketch) {
+        window.drawBackgroundSketch();
+    }
 }
 
 if ($("themeToggle")) {
@@ -184,6 +196,664 @@ if ($("themeToggle")) {
     };
 }
 updateThemeVisuals();
+
+// --- Telemetry Channel Hold & Per-Page Freeze System ---
+function getChannelForTab(tab) {
+    switch (tab) {
+        case "processor": return "cpu";
+        case "memory": return "mem";
+        case "processes": return "processes";
+        case "network": return "net";
+        case "storage": return "disk";
+        case "sensors": return "sensors";
+        case "overview": return "overview";
+        case "system": return "system";
+        case "gpu": return "gpu";
+        case "battery": return "battery";
+        case "peripherals": return "peripherals";
+        case "diagnostics": return "net";
+        default: return "overview";
+    }
+}
+
+const pauseState = {
+    global: false,
+    cpu: false,
+    mem: false,
+    processes: false,
+    net: false,
+    disk: false,
+    sensors: false,
+    overview: false,
+    system: false,
+    gpu: false,
+    battery: false,
+    peripherals: false
+};
+let lastPauseTime = null;
+
+function syncHoldsToBackend() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        try {
+            ws.send(JSON.stringify({
+                type: "hold_update",
+                holds: pauseState
+            }));
+        } catch (e) {
+            console.error("Failed to sync holds to backend:", e);
+        }
+    }
+}
+
+function updatePauseUI() {
+    const primaryChannels = ["cpu", "mem", "processes", "net", "disk", "sensors"];
+    const allChannels = ["cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"];
+    const allHeld = allChannels.every(ch => pauseState[ch]);
+    const anyHeld = allChannels.some(ch => pauseState[ch]);
+    const heldCount = allChannels.filter(ch => pauseState[ch]).length;
+    
+    // Page-specific Live/Hold Button in Header (operates strictly on current activeTab)
+    const currentChannel = getChannelForTab(activeTab);
+    const isCurrentPageHeld = !!pauseState[currentChannel];
+    const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+
+    const masterBtn = $("masterPauseBtn");
+    const masterText = $("masterPauseText");
+    if (masterBtn && masterText) {
+        masterBtn.classList.toggle("is-paused", isCurrentPageHeld);
+        masterText.textContent = isCurrentPageHeld ? "HOLD" : "LIVE";
+        masterBtn.title = isCurrentPageHeld 
+            ? `${tabLabel} telemetry frozen. Click to resume this page (Shift+Space)` 
+            : `${tabLabel} telemetry streaming live. Click to freeze this page (Shift+Space)`;
+    }
+
+    // Drawer Master Snapshot Button (All Channels)
+    const globalBtn = $("btnHoldGlobal");
+    if (globalBtn) {
+        globalBtn.classList.toggle("is-held", allHeld);
+        globalBtn.textContent = allHeld ? "HELD-ALL" : (anyHeld ? `HELD-${heldCount}` : "LIVE");
+    }
+
+    // Drawer Individual channel buttons and rows
+    primaryChannels.forEach(ch => {
+        const isPaused = !!pauseState[ch];
+        const btn = $(`btnHold${ch.charAt(0).toUpperCase() + ch.slice(1)}`);
+        const row = document.querySelector(`[data-row="${ch}"]`);
+        if (btn) {
+            btn.classList.toggle("is-held", isPaused);
+            btn.textContent = isPaused ? "HELD" : "LIVE";
+        }
+        if (row) {
+            row.classList.toggle("is-paused", isPaused);
+        }
+    });
+
+    if ($("daemonStatusText")) {
+        if (allHeld) {
+            $("daemonStatusText").textContent = "Connected (All Held)";
+        } else if (anyHeld) {
+            $("daemonStatusText").textContent = `Connected (${heldCount} Held)`;
+        } else {
+            $("daemonStatusText").textContent = "Connected";
+        }
+    }
+    if ($("lastUpdate") && allHeld) {
+        $("lastUpdate").textContent = `Frozen at ${lastPauseTime || "Paused"}`;
+    }
+}
+
+function toggleCurrentPagePause() {
+    const ch = getChannelForTab(activeTab);
+    toggleChannel(ch);
+}
+
+function toggleMasterPause() {
+    const allChannels = ["cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"];
+    const allHeld = allChannels.every(c => pauseState[c]);
+    const targetState = !allHeld;
+
+    pauseState.global = targetState;
+    allChannels.forEach(c => {
+        pauseState[c] = targetState;
+    });
+
+    if (targetState) {
+        lastPauseTime = new Date().toLocaleTimeString();
+    } else {
+        refreshActiveTabCharts();
+        if (activeTab === "processes" && latest) {
+            renderProcessTable(latest.processes || []);
+        }
+    }
+    updatePauseUI();
+    syncHoldsToBackend();
+}
+
+function toggleChannel(ch) {
+    if (!pauseState.hasOwnProperty(ch)) return;
+
+    // Toggle target channel
+    pauseState[ch] = !pauseState[ch];
+
+    // Recalculate global state: true only if every channel is held
+    const allChannels = ["cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"];
+    const allHeld = allChannels.every(c => pauseState[c]);
+    pauseState.global = allHeld;
+
+    if (!pauseState[ch]) {
+        // Channel was released / resumed: immediately refresh views
+        if (ch === "processes" && activeTab === "processes" && latest) {
+            renderProcessTable(latest.processes || []);
+        }
+        refreshActiveTabCharts();
+    } else {
+        lastPauseTime = new Date().toLocaleTimeString();
+    }
+
+    updatePauseUI();
+    syncHoldsToBackend();
+}
+
+function resumeAllChannels() {
+    pauseState.global = false;
+    const allChannels = ["cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"];
+    allChannels.forEach(k => { pauseState[k] = false; });
+    refreshActiveTabCharts();
+    if (activeTab === "processes" && latest) {
+        renderProcessTable(latest.processes || []);
+    }
+    updatePauseUI();
+    syncHoldsToBackend();
+}
+
+function pauseAllChannels() {
+    lastPauseTime = new Date().toLocaleTimeString();
+    pauseState.global = true;
+    const allChannels = ["cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"];
+    allChannels.forEach(k => { pauseState[k] = true; });
+    updatePauseUI();
+    syncHoldsToBackend();
+}
+
+function initPauseControls() {
+    const masterBtn = $("masterPauseBtn");
+    if (masterBtn) {
+        masterBtn.onclick = () => toggleCurrentPagePause();
+    }
+
+    const drawerToggle = $("channelPauseToggleBtn");
+    const drawer = $("pauseDrawer");
+    const closeBtn = $("closePauseDrawer");
+
+    if (drawerToggle && drawer) {
+        drawerToggle.onclick = (e) => {
+            e.stopPropagation();
+            const isOpen = drawer.style.display !== "none";
+            drawer.style.display = isOpen ? "none" : "flex";
+            drawerToggle.style.borderColor = isOpen ? "var(--border)" : "var(--accent)";
+        };
+    }
+    if (closeBtn && drawer) {
+        closeBtn.onclick = () => {
+            drawer.style.display = "none";
+            if (drawerToggle) drawerToggle.style.borderColor = "var(--border)";
+        };
+    }
+
+    document.addEventListener("click", (e) => {
+        if (drawer && drawer.style.display !== "none") {
+            if (!drawer.contains(e.target) && e.target !== drawerToggle && !drawerToggle.contains(e.target)) {
+                drawer.style.display = "none";
+                if (drawerToggle) drawerToggle.style.borderColor = "var(--border)";
+            }
+        }
+    });
+
+    const channelButtons = document.querySelectorAll(".channel-toggle-btn");
+    channelButtons.forEach(btn => {
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            const ch = btn.dataset.channel;
+            if (ch === "global") {
+                toggleMasterPause();
+            } else {
+                toggleChannel(ch);
+            }
+        };
+    });
+
+    if ($("resumeAllChannelsBtn")) {
+        $("resumeAllChannelsBtn").onclick = () => resumeAllChannels();
+    }
+    if ($("pauseAllChannelsBtn")) {
+        $("pauseAllChannelsBtn").onclick = () => pauseAllChannels();
+    }
+
+    window.addEventListener("keydown", (e) => {
+        if (e.shiftKey && e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
+            e.preventDefault();
+            toggleCurrentPagePause();
+        }
+        if (e.key === "Escape" && drawer && drawer.style.display !== "none") {
+            drawer.style.display = "none";
+            if (drawerToggle) drawerToggle.style.borderColor = "var(--border)";
+        }
+    });
+
+    updatePauseUI();
+}
+initPauseControls();
+
+// --- Japanese Torii Gate & Mt. Fuji Ink Sketch (0.00% Idle CPU Background Canvas) ---
+function initBackgroundSketch() {
+    const canvas = $("bg-sketch-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    function render() {
+        if (!canvas) return;
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, w, h);
+
+        const isLight = document.documentElement.classList.contains("light");
+
+        // Scale sketch so it remains delicate and proportional across displays
+        const scale = Math.min(w / 1200, h / 800, 1.0);
+        const s = Math.max(0.65, Math.min(scale, 1.15));
+
+        const cx = Math.round(w * 0.5);
+        const baseY = Math.round(h * 0.70);
+
+        // 1. Celestial Sun/Moon Disc (Enso glow behind Mt. Fuji)
+        const peakY = baseY - 180 * s;
+        const sunRadius = 72 * s;
+        const sunY = peakY + 22 * s;
+
+        const sunGrad = ctx.createRadialGradient(cx, sunY, 0, cx, sunY, sunRadius);
+        if (isLight) {
+            sunGrad.addColorStop(0, "rgba(223, 90, 53, 0.20)");
+            sunGrad.addColorStop(0.55, "rgba(223, 90, 53, 0.08)");
+            sunGrad.addColorStop(1, "rgba(223, 90, 53, 0)");
+        } else {
+            sunGrad.addColorStop(0, "rgba(223, 90, 53, 0.18)");
+            sunGrad.addColorStop(0.60, "rgba(223, 90, 53, 0.06)");
+            sunGrad.addColorStop(1, "rgba(223, 90, 53, 0)");
+        }
+        ctx.fillStyle = sunGrad;
+        ctx.beginPath();
+        ctx.arc(cx, sunY, sunRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Distant Soaring Cranes (丹頂鶴)
+        function drawCrane(x, y, size, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = isLight ? "rgba(44, 37, 31, 0.38)" : "rgba(255, 255, 255, 0.38)";
+            ctx.beginPath();
+            // Left wing
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(-size * 0.5, -size * 0.55, -size, -size * 0.3);
+            ctx.quadraticCurveTo(-size * 0.4, -size * 0.08, 0, 0);
+            // Right wing
+            ctx.quadraticCurveTo(size * 0.4, -size * 0.08, size, -size * 0.3);
+            ctx.quadraticCurveTo(size * 0.5, -size * 0.55, 0, 0);
+            // Body / Head
+            ctx.lineTo(0, size * 0.35);
+            ctx.lineTo(-size * 0.08, 0);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        drawCrane(cx + 95 * s, peakY - 32 * s, 11 * s, -0.15);
+        drawCrane(cx + 122 * s, peakY - 48 * s, 8.5 * s, -0.22);
+        drawCrane(cx + 74 * s, peakY - 18 * s, 7 * s, -0.08);
+
+        // 3. Mt. Fuji (富士山) Silhouette
+        const craterW = 44 * s;
+        ctx.beginPath();
+        ctx.moveTo(cx - 240 * s, baseY);
+        // Left volcanic slope
+        ctx.bezierCurveTo(cx - 130 * s, baseY - 25 * s, cx - 65 * s, peakY + 45 * s, cx - craterW * 0.5, peakY);
+        // Crater dip
+        ctx.lineTo(cx - craterW * 0.15, peakY + 1.8 * s);
+        ctx.lineTo(cx + craterW * 0.15, peakY + 1.8 * s);
+        ctx.lineTo(cx + craterW * 0.5, peakY);
+        // Right volcanic slope
+        ctx.bezierCurveTo(cx + 65 * s, peakY + 45 * s, cx + 130 * s, baseY - 25 * s, cx + 240 * s, baseY);
+        ctx.closePath();
+
+        const fujiGrad = ctx.createLinearGradient(cx, peakY, cx, baseY);
+        if (isLight) {
+            fujiGrad.addColorStop(0, "rgba(55, 45, 38, 0.09)");
+            fujiGrad.addColorStop(0.65, "rgba(55, 45, 38, 0.04)");
+            fujiGrad.addColorStop(1, "rgba(55, 45, 38, 0.01)");
+        } else {
+            fujiGrad.addColorStop(0, "rgba(255, 255, 255, 0.06)");
+            fujiGrad.addColorStop(0.65, "rgba(255, 255, 255, 0.025)");
+            fujiGrad.addColorStop(1, "rgba(255, 255, 255, 0.005)");
+        }
+        ctx.fillStyle = fujiGrad;
+        ctx.fill();
+
+        ctx.strokeStyle = isLight ? "rgba(55, 45, 38, 0.14)" : "rgba(255, 255, 255, 0.07)";
+        ctx.lineWidth = 0.85;
+        ctx.stroke();
+
+        // 4. Mt. Fuji Snow Cap (雪冠)
+        ctx.beginPath();
+        ctx.moveTo(cx - 56 * s, peakY + 48 * s);
+        // Serrated snow tongues
+        const snowOffsets = [
+            [-45, 42], [-37, 54], [-27, 40], [-17, 57], [-8, 43],
+            [0, 61], [8, 42], [17, 58], [27, 41], [37, 53], [45, 40]
+        ];
+        snowOffsets.forEach(([px, py]) => {
+            ctx.lineTo(cx + px * s, peakY + py * s);
+        });
+        ctx.lineTo(cx + 56 * s, peakY + 48 * s);
+        // Right slope up to crater
+        ctx.bezierCurveTo(cx + 38 * s, peakY + 28 * s, cx + 28 * s, peakY + 12 * s, cx + craterW * 0.5, peakY);
+        ctx.lineTo(cx + craterW * 0.15, peakY + 1.8 * s);
+        ctx.lineTo(cx - craterW * 0.15, peakY + 1.8 * s);
+        ctx.lineTo(cx - craterW * 0.5, peakY);
+        // Left slope down to snow start
+        ctx.bezierCurveTo(cx - 28 * s, peakY + 12 * s, cx - 38 * s, peakY + 28 * s, cx - 56 * s, peakY + 48 * s);
+        ctx.closePath();
+
+        if (isLight) {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(55, 45, 38, 0.15)";
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+        } else {
+            ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.shadowColor = "rgba(255, 255, 255, 0.22)";
+            ctx.shadowBlur = 10 * s;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.10)";
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+        }
+
+        // 5. Kasumi Mist Bands (霞)
+        function drawMistBand(y, xStart, xEnd, height) {
+            const grad = ctx.createLinearGradient(xStart, y, xEnd, y);
+            const mistColor = isLight ? "250, 247, 242" : "255, 255, 255";
+            const maxAlpha = isLight ? 0.38 : 0.07;
+            grad.addColorStop(0, `rgba(${mistColor}, 0)`);
+            grad.addColorStop(0.25, `rgba(${mistColor}, ${maxAlpha})`);
+            grad.addColorStop(0.75, `rgba(${mistColor}, ${maxAlpha})`);
+            grad.addColorStop(1, `rgba(${mistColor}, 0)`);
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            const bw = xEnd - xStart;
+            const rad = height * 0.5;
+            if (ctx.roundRect) {
+                ctx.roundRect(xStart, y - rad, bw, height, rad);
+            } else {
+                ctx.rect(xStart, y - rad, bw, height);
+            }
+            ctx.fill();
+        }
+
+        drawMistBand(baseY - 45 * s, cx - 180 * s, cx + 130 * s, 14 * s);
+        drawMistBand(baseY - 85 * s, cx - 60 * s, cx + 200 * s, 12 * s);
+        drawMistBand(baseY - 125 * s, cx - 140 * s, cx - 10 * s, 9 * s);
+
+        // 6. Traditional Torii Gate (鳥居)
+        const gateY = baseY + 12 * s;
+        const gateColor = isLight ? "rgba(202, 62, 38, 0.82)" : "rgba(223, 90, 53, 0.72)";
+        const capColor = isLight ? "rgba(42, 36, 32, 0.92)" : "rgba(25, 23, 30, 0.95)";
+        const stoneColor = isLight ? "rgba(95, 85, 80, 0.38)" : "rgba(200, 210, 225, 0.28)";
+
+        // Stone plinths (Daiishi 台石)
+        ctx.fillStyle = stoneColor;
+        const plinthW = 12 * s;
+        const plinthH = 5 * s;
+        ctx.fillRect(cx - 26 * s - plinthW * 0.5, gateY - plinthH, plinthW, plinthH);
+        ctx.fillRect(cx + 26 * s - plinthW * 0.5, gateY - plinthH, plinthW, plinthH);
+
+        // Pillars (Hashira 柱) - Slight inward incline
+        ctx.fillStyle = gateColor;
+        ctx.beginPath();
+        // Left pillar
+        ctx.moveTo(cx - 23.5 * s, gateY - 62 * s);
+        ctx.lineTo(cx - 17.5 * s, gateY - 62 * s);
+        ctx.lineTo(cx - 22.5 * s, gateY - plinthH);
+        ctx.lineTo(cx - 29.5 * s, gateY - plinthH);
+        ctx.closePath();
+        // Right pillar
+        ctx.moveTo(cx + 17.5 * s, gateY - 62 * s);
+        ctx.lineTo(cx + 23.5 * s, gateY - 62 * s);
+        ctx.lineTo(cx + 29.5 * s, gateY - plinthH);
+        ctx.lineTo(cx + 22.5 * s, gateY - plinthH);
+        ctx.closePath();
+        ctx.fill();
+
+        // Horizontal Tie-Beam (Nuki 貫)
+        const nukiY = gateY - 48 * s;
+        const nukiW = 76 * s;
+        const nukiH = 5.2 * s;
+        ctx.fillRect(cx - nukiW * 0.5, nukiY, nukiW, nukiH);
+
+        // Small wedge pegs (Kusabi 楔) on outer edges of pillars
+        ctx.fillStyle = capColor;
+        ctx.fillRect(cx - 28.5 * s, nukiY - 1 * s, 2 * s, nukiH + 2 * s);
+        ctx.fillRect(cx + 26.5 * s, nukiY - 1 * s, 2 * s, nukiH + 2 * s);
+
+        // Central Vertical Strut / Tablet (Gakuzuka 額束)
+        ctx.fillStyle = gateColor;
+        const gakuzukaW = 5.5 * s;
+        ctx.fillRect(cx - gakuzukaW * 0.5, gateY - 62 * s, gakuzukaW, 14 * s);
+
+        // Sub-Lintel (Shimaki 島木)
+        const shimakiW = 98 * s;
+        const shimakiH = 5 * s;
+        ctx.fillRect(cx - shimakiW * 0.5, gateY - 67 * s, shimakiW, shimakiH);
+
+        // Top Lintel (Kasagi 笠木) with graceful curved upward wing tips (Sori 反り)
+        const kasagiSpan = 56 * s;
+        ctx.beginPath();
+        ctx.moveTo(cx - kasagiSpan, gateY - 73 * s);
+        ctx.quadraticCurveTo(cx, gateY - 68 * s, cx + kasagiSpan, gateY - 73 * s);
+        ctx.lineTo(cx + kasagiSpan - 2 * s, gateY - 67 * s);
+        ctx.quadraticCurveTo(cx, gateY - 62.5 * s, cx - kasagiSpan + 2 * s, gateY - 67 * s);
+        ctx.closePath();
+        ctx.fill();
+
+        // Roof Cap on Kasagi (protective copper/black capping)
+        ctx.fillStyle = capColor;
+        ctx.beginPath();
+        ctx.moveTo(cx - kasagiSpan - 1 * s, gateY - 74 * s);
+        ctx.quadraticCurveTo(cx, gateY - 69 * s, cx + kasagiSpan + 1 * s, gateY - 74 * s);
+        ctx.lineTo(cx + kasagiSpan, gateY - 72 * s);
+        ctx.quadraticCurveTo(cx, gateY - 67 * s, cx - kasagiSpan, gateY - 72 * s);
+        ctx.closePath();
+        ctx.fill();
+
+        // 7. Authentic Red Hanko Seal (落款印 - "風" for Wind / WindyDash)
+        const sealX = cx + 175 * s;
+        const sealY = baseY - 24 * s;
+        const sealSize = 16 * s;
+        const sealRad = 2.2 * s;
+
+        ctx.fillStyle = "rgba(215, 52, 38, 0.75)";
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(sealX, sealY, sealSize, sealSize, sealRad);
+        } else {
+            ctx.rect(sealX, sealY, sealSize, sealSize);
+        }
+        ctx.fill();
+
+        // Stylized "風" seal inscription
+        ctx.strokeStyle = isLight ? "#ffffff" : "rgba(255, 255, 255, 0.95)";
+        ctx.lineWidth = Math.max(1, 1.1 * s);
+        ctx.beginPath();
+        // Outer enclosure stroke
+        ctx.moveTo(sealX + sealSize * 0.22, sealY + sealSize * 0.25);
+        ctx.lineTo(sealX + sealSize * 0.78, sealY + sealSize * 0.25);
+        ctx.lineTo(sealX + sealSize * 0.78, sealY + sealSize * 0.78);
+        ctx.lineTo(sealX + sealSize * 0.70, sealY + sealSize * 0.72);
+        // Left down stroke
+        ctx.moveTo(sealX + sealSize * 0.22, sealY + sealSize * 0.25);
+        ctx.lineTo(sealX + sealSize * 0.22, sealY + sealSize * 0.78);
+        // Inner character marks
+        ctx.moveTo(sealX + sealSize * 0.42, sealY + sealSize * 0.40);
+        ctx.lineTo(sealX + sealSize * 0.58, sealY + sealSize * 0.40);
+        ctx.moveTo(sealX + sealSize * 0.50, sealY + sealSize * 0.40);
+        ctx.lineTo(sealX + sealSize * 0.50, sealY + sealSize * 0.65);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    window.drawBackgroundSketch = render;
+    render();
+
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(render, 120);
+    }, { passive: true });
+}
+initBackgroundSketch();
+
+// --- Maple Leaves Particle Simulation (Canvas) ---
+function initMapleLeavesCanvas() {
+    const canvas = $("maple-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    window.addEventListener("resize", () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+    }, { passive: true });
+
+    let leavesEnabled = localStorage.getItem("windydash-leaves") !== "off";
+    const toggleBtn = $("toggleLeavesBtn");
+    if (toggleBtn) {
+        toggleBtn.style.opacity = leavesEnabled ? "1" : "0.45";
+        toggleBtn.title = leavesEnabled ? "Falling leaves active (Click to pause)" : "Falling leaves paused (Click to start)";
+        toggleBtn.onclick = () => {
+            leavesEnabled = !leavesEnabled;
+            localStorage.setItem("windydash-leaves", leavesEnabled ? "on" : "off");
+            toggleBtn.style.opacity = leavesEnabled ? "1" : "0.45";
+            toggleBtn.title = leavesEnabled ? "Falling leaves active (Click to pause)" : "Falling leaves paused (Click to start)";
+            if (!leavesEnabled) ctx.clearRect(0, 0, width, height);
+        };
+    }
+
+    // Palette calibrated for dark mode (Ronin Slate & Charcoal)
+    const DARK_LEAF_COLORS = [
+        "rgba(223, 90, 53, 0.85)",   // Maple Red
+        "rgba(242, 114, 79, 0.80)",  // Bright Vermilion
+        "rgba(245, 183, 68, 0.82)",  // Autumn Amber Gold
+        "rgba(211, 62, 56, 0.85)",   // Deep Crimson
+        "rgba(184, 45, 39, 0.85)",   // Rust Red
+        "rgba(92, 212, 168, 0.65)"   // Anemo Mint Breeze
+    ];
+
+    // Palette calibrated for light mode (Rice Paper & Warm Linen)
+    const LIGHT_LEAF_COLORS = [
+        "rgba(194, 65, 12, 0.85)",   // Terracotta Maple
+        "rgba(217, 119, 6, 0.85)",   // Amber Gold
+        "rgba(185, 28, 28, 0.85)",   // Crimson Sumi
+        "rgba(153, 27, 27, 0.85)",   // Deep Rust
+        "rgba(223, 90, 53, 0.85)",   // Rich Maple Orange
+        "rgba(21, 128, 61, 0.70)"    // Jade Wind
+    ];
+
+    class Leaf {
+        constructor() {
+            this.colorIdx = Math.floor(Math.random() * 6);
+            this.reset(true);
+        }
+
+        reset(initial = false) {
+            this.x = Math.random() * width;
+            this.y = initial ? Math.random() * height : -30;
+            this.size = 10 + Math.random() * 13;
+            this.speedY = 0.75 + Math.random() * 1.35;
+            this.speedX = -0.6 + Math.random() * 1.3;
+            this.angle = Math.random() * Math.PI * 2;
+            this.rotationSpeed = (Math.random() - 0.5) * 0.035;
+            this.oscillationSpeed = 0.018 + Math.random() * 0.03;
+            this.colorIdx = Math.floor(Math.random() * 6);
+        }
+
+        update() {
+            this.y += this.speedY;
+            this.x += this.speedX + Math.sin(this.y * this.oscillationSpeed) * 0.85;
+            this.angle += this.rotationSpeed;
+
+            if (this.y > height + 40 || this.x < -40 || this.x > width + 40) {
+                this.reset();
+            }
+        }
+
+        draw() {
+            const isLight = document.documentElement.classList.contains("light");
+            const palette = isLight ? LIGHT_LEAF_COLORS : DARK_LEAF_COLORS;
+            const color = palette[this.colorIdx % palette.length];
+
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle);
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            // Stylized 3-point maple silhouette with organic curvature
+            const s = this.size;
+            ctx.moveTo(0, -s);
+            ctx.bezierCurveTo(s * 0.8, -s * 0.5, s * 0.9, s * 0.3, 0, s);
+            ctx.bezierCurveTo(-s * 0.9, s * 0.3, -s * 0.8, -s * 0.5, 0, -s);
+            ctx.fill();
+
+            // Delicate leaf spine vein
+            ctx.strokeStyle = isLight ? "rgba(255, 255, 255, 0.45)" : "rgba(255, 245, 230, 0.3)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, -s * 0.7);
+            ctx.lineTo(0, s * 0.7);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+    }
+
+    const leaves = Array.from({ length: 34 }, () => new Leaf());
+
+    function renderLeaves() {
+        if (leavesEnabled) {
+            ctx.clearRect(0, 0, width, height);
+            for (let i = 0; i < leaves.length; i++) {
+                leaves[i].update();
+                leaves[i].draw();
+            }
+        }
+        requestAnimationFrame(renderLeaves);
+    }
+    renderLeaves();
+}
+initMapleLeavesCanvas();
 
 // --- Tab Switching with Performance Hooks ---
 document.querySelectorAll(".tab").forEach(b => {
@@ -198,6 +868,7 @@ document.querySelectorAll(".tab").forEach(b => {
         if (activeTab === "processes" && latest) {
             renderProcessTable(latest.processes || []);
         }
+        updatePauseUI();
     };
 });
 
@@ -350,91 +1021,129 @@ function updateHardware(d) {
     const c = d.cpu || {}, m = d.memory || {}, s = d.system || {}, n = d.network || {}, disk = d.disk || {};
     const sysDet = s.details || {};
 
-    push(history.cpu, c.global_percent);
-    push(history.mem, m.percent);
-    push(history.swap, m.swap_total ? ((m.swap_total - m.swap_free) / m.swap_total * 100) : 0);
-    push(history.rx, n.rx_bytes_per_sec);
-    push(history.tx, n.tx_bytes_per_sec);
-    push(history.read, disk.read_bytes_per_sec);
-    push(history.write, disk.write_bytes_per_sec);
-    push(history.load, s.load1);
-    push(history.time, Date.now());
+    const channels = ["cpu", "mem", "processes", "net", "disk", "sensors"];
+    const allHeld = channels.every(ch => pauseState[ch]);
+    const anyHeld = channels.some(ch => pauseState[ch]);
+    const heldCount = channels.filter(ch => pauseState[ch]).length;
+
+    if (!pauseState.cpu) push(history.cpu, c.global_percent);
+    if (!pauseState.mem) {
+        push(history.mem, m.percent);
+        push(history.swap, m.swap_total ? ((m.swap_total - m.swap_free) / m.swap_total * 100) : 0);
+    }
+    if (!pauseState.net) {
+        push(history.rx, n.rx_bytes_per_sec);
+        push(history.tx, n.tx_bytes_per_sec);
+    }
+    if (!pauseState.disk) {
+        push(history.read, disk.read_bytes_per_sec);
+        push(history.write, disk.write_bytes_per_sec);
+    }
+    if (!allHeld) {
+        push(history.load, s.load1);
+        push(history.time, Date.now());
+    }
 
     // Update connection status
     const statusEl = $("daemonStatus");
     if (statusEl) {
         statusEl.className = "status connected";
     }
-    if ($("daemonStatusText")) $("daemonStatusText").textContent = "Connected";
-    if ($("lastUpdate")) $("lastUpdate").textContent = `Updated ${new Date().toLocaleTimeString()}`;
-    if ($("hostInfo")) $("hostInfo").textContent = `${s.hostname || "Linux"} • kernel ${s.kernel || "—"} • uptime ${s.uptime_human || "—"}`;
+    if ($("daemonStatusText")) {
+        $("daemonStatusText").textContent = allHeld ? "Connected (Held)" : (anyHeld ? `Connected (${heldCount} Held)` : "Connected");
+    }
+    if ($("lastUpdate")) {
+        if (allHeld) {
+            $("lastUpdate").textContent = `Frozen at ${lastPauseTime || "Paused"}`;
+        } else {
+            $("lastUpdate").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        }
+    }
+    if (!allHeld && $("hostInfo")) $("hostInfo").textContent = `${s.hostname || "Linux"} • kernel ${s.kernel || "—"} • uptime ${s.uptime_human || "—"}`;
 
     // Overview Hero Cards
-    if ($("ovCpu")) $("ovCpu").textContent = fmtPct(c.global_percent);
-    if ($("ovCpuFreq")) $("ovCpuFreq").textContent = `${(c.freq_current_mhz || 0).toFixed(0)} MHz • ${c.logical_cores || 0} cores`;
-    if ($("ovMem")) $("ovMem").textContent = fmtPct(m.percent);
-    if ($("ovMemDetail")) $("ovMemDetail").textContent = `${fmtBytes(m.used)} / ${fmtBytes(m.total)}`;
-    if ($("ovLoad")) $("ovLoad").textContent = Number(s.load1 || 0).toFixed(2);
-    if ($("ovUptime")) $("ovUptime").textContent = s.uptime_human || "—";
-    if ($("ovNet")) $("ovNet").textContent = `↓ ${fmtRate(n.rx_bytes_per_sec || 0)}`;
-    if ($("ovNetDetail")) $("ovNetDetail").textContent = `↑ ${fmtRate(n.tx_bytes_per_sec || 0)}`;
+    if (!pauseState.overview) {
+        if (!pauseState.cpu) {
+            if ($("ovCpu")) $("ovCpu").textContent = fmtPct(c.global_percent);
+            if ($("ovCpuFreq")) $("ovCpuFreq").textContent = `${(c.freq_current_mhz || 0).toFixed(0)} MHz • ${c.logical_cores || 0} cores`;
+        }
+        if (!pauseState.mem) {
+            if ($("ovMem")) $("ovMem").textContent = fmtPct(m.percent);
+            if ($("ovMemDetail")) $("ovMemDetail").textContent = `${fmtBytes(m.used)} / ${fmtBytes(m.total)}`;
+        }
+        if (!allHeld) {
+            if ($("ovLoad")) $("ovLoad").textContent = Number(s.load1 || 0).toFixed(2);
+            if ($("ovUptime")) $("ovUptime").textContent = s.uptime_human || "—";
+        }
+        if (!pauseState.net) {
+            if ($("ovNet")) $("ovNet").textContent = `↓ ${fmtRate(n.rx_bytes_per_sec || 0)}`;
+            if ($("ovNetDetail")) $("ovNetDetail").textContent = `↑ ${fmtRate(n.tx_bytes_per_sec || 0)}`;
+        }
 
-    // Top process cards on Overview
-    const procList = d.processes || [];
-    if ($("topProcess")) {
-        $("topProcess").innerHTML = procList.slice(0, 4).map((proc, i) => `
-            <div class="process-item">
-                <div class="process-rank">${i + 1}</div>
-                <div class="process-info">
-                    <div class="process-name">${esc(proc.name || "—")}</div>
-                    <div class="process-meta">PID ${proc.pid} • ${Number(proc.cpu_percent || 0).toFixed(1)}% CPU • ${Number(proc.memory_percent || 0).toFixed(1)}% RAM</div>
-                </div>
-            </div>
-        `).join("") || "—";
-    }
-
-    // Hot sensors snapshot on Overview
-    const tSensors = Object.values(d.sensors || {}).filter(z => z.type === "temperature");
-    if ($("hotSensors")) {
-        $("hotSensors").innerHTML = tSensors
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 4)
-            .map((z, i) => `
-                <div class="sensor-item">
-                    <div class="sensor-rank">${i + 1}</div>
-                    <div class="sensor-info">
-                        <div class="sensor-name">${esc(z.label)}</div>
-                        <div class="sensor-meta">Thermal sensor</div>
+        // Top process cards on Overview
+        const procList = d.processes || [];
+        if (!pauseState.processes) {
+            if ($("topProcess")) {
+                $("topProcess").innerHTML = procList.slice(0, 4).map((proc, i) => `
+                    <div class="process-item">
+                        <div class="process-rank">${i + 1}</div>
+                        <div class="process-info">
+                            <div class="process-name">${esc(proc.name || "—")}</div>
+                            <div class="process-meta">PID ${proc.pid} • ${Number(proc.cpu_percent || 0).toFixed(1)}% CPU • ${Number(proc.memory_percent || 0).toFixed(1)}% RAM</div>
+                        </div>
                     </div>
-                    <div class="sensor-value">${fmtTemp(z.value)}</div>
-                </div>
-            `).join("") || '<div class="empty">No temperature sensors.</div>';
+                `).join("") || "—";
+            }
+        }
+
+        // Hot sensors snapshot on Overview
+        const tSensors = Object.values(d.sensors || {}).filter(z => z.type === "temperature");
+        if (!pauseState.sensors) {
+            if ($("hotSensors")) {
+                $("hotSensors").innerHTML = tSensors
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 4)
+                    .map((z, i) => `
+                        <div class="sensor-item">
+                            <div class="sensor-rank">${i + 1}</div>
+                            <div class="sensor-info">
+                                <div class="sensor-name">${esc(z.label)}</div>
+                                <div class="sensor-meta">Thermal sensor</div>
+                            </div>
+                            <div class="sensor-value">${fmtTemp(z.value)}</div>
+                        </div>
+                    `).join("") || '<div class="empty">No temperature sensors.</div>';
+            }
+        }
     }
 
     // Quick System & System Tab stats
-    if ($("quickSystem")) {
-        const osLabel = sysDet.pretty_name || s.os || "Linux";
-        $("quickSystem").innerHTML = [
-            ["Hostname", esc(s.hostname)],
-            ["OS", `<span style="display:inline-flex;align-items:center;gap:6px;">${getOsIconSvg(sysDet, s, 14)} <span>${esc(osLabel)}</span></span>`],
-            ["Kernel", esc(s.kernel)],
-            ["Uptime", esc(s.uptime_human)]
-        ].map(x => `<div>${x[0]}</div><div>${x[1]}</div>`).join("");
-    }
-    if ($("systemInfo")) {
-        $("systemInfo").innerHTML = [
-            ["OS Distribution", s.os],
-            ["Kernel Release", s.kernel],
-            ["Hardware Model", sysDet.hardware_model || "Host Platform"],
-            ["Boot Timestamp", s.boot_time],
-            ["Operating Uptime", s.uptime_human],
-            ["Timezone", sysDet.timezone || "UTC"],
-            ["C Library", sysDet.libc || "glibc"],
-            ["Python Engine", s.python]
-        ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+    if (!pauseState.system && !allHeld) {
+        if ($("quickSystem")) {
+            const osLabel = sysDet.pretty_name || s.os || "Linux";
+            $("quickSystem").innerHTML = [
+                ["Hostname", esc(s.hostname)],
+                ["OS", `<span style="display:inline-flex;align-items:center;gap:6px;">${getOsIconSvg(sysDet, s, 14)} <span>${esc(osLabel)}</span></span>`],
+                ["Kernel", esc(s.kernel)],
+                ["Uptime", esc(s.uptime_human)]
+            ].map(x => `<div>${x[0]}</div><div>${x[1]}</div>`).join("");
+        }
+        if ($("systemInfo")) {
+            $("systemInfo").innerHTML = [
+                ["OS Distribution", s.os],
+                ["Kernel Release", s.kernel],
+                ["Hardware Model", sysDet.hardware_model || "Host Platform"],
+                ["Boot Timestamp", s.boot_time],
+                ["Operating Uptime", s.uptime_human],
+                ["Timezone", sysDet.timezone || "UTC"],
+                ["C Library", sysDet.libc || "glibc"],
+                ["Python Engine", s.python]
+            ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
+        }
     }
 
     // CPU Hero Banner & Badges
+    if (!pauseState.cpu) {
     const cpuDet = c.details || {};
     if ($("cpuFullModel")) {
         $("cpuFullModel").textContent = cpuDet.model_name || c.model || "Generic Processor";
@@ -501,8 +1210,10 @@ function updateHardware(d) {
             ["NUMA nodes", `${cpuDet.numa_nodes || 1} Node(s)`]
         ].map(x => `<div>${esc(x[0])}</div><div>${x[1]}</div>`).join("");
     }
+    }
 
     // Memory Hero Banner & DIMM Slots Topology
+    if (!pauseState.mem) {
     const memHw = m.hardware || {};
     const memArray = memHw.array || {};
     const memSummary = memHw.summary || {};
@@ -677,8 +1388,10 @@ function updateHardware(d) {
             ["Free RAM Capacity", fmtBytes(m.free)]
         ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
     }
+    }
 
     // System Hero Header & Badges
+    if (!pauseState.system && !allHeld) {
     const prettyOs = sysDet.pretty_name || s.os || "Linux System";
     if ($("sysIconChip")) {
         $("sysIconChip").innerHTML = getOsIconSvg(sysDet, s, 30);
@@ -742,48 +1455,57 @@ function updateHardware(d) {
             ["System Timezone", sysDet.timezone || "UTC"]
         ].map(x => `<div>${esc(x[0])}</div><div>${esc(x[1])}</div>`).join("");
     }
+    }
 
     // Processes Tab update
-    if (activeTab === "processes") {
-        renderProcessTable(procList);
+    if (!pauseState.processes) {
+        if (activeTab === "processes") {
+            renderProcessTable(procList);
+        }
     }
 
     // Peripherals Rendering: Displays, USB & Thunderbolt
-    const periph = d.peripherals || {};
-    if ($("displayList")) {
-        const dps = periph.displays || [];
-        $("displayList").innerHTML = dps.length
-            ? dps.map(dp => `
-                <div class="sensor-row">
-                    <div><b>${esc(dp.connector)}</b><small>Primary: ${esc(dp.resolution)}</small></div>
-                    <span class="badge">${(dp.available_modes || []).length} modes</span>
-                </div>
-            `).join("")
-            : '<div class="empty">No external displays connected.</div>';
-    }
-    if ($("usbList")) {
-        const usbs = periph.usb || [];
-        const tbs = periph.thunderbolt || [];
-        let html = "";
-        if (usbs.length) {
-            html += usbs.map(u => `
-                <div class="sensor-row"><div><b>${esc(u)}</b></div><span class="badge">USB</span></div>
-            `).join("");
+    if (!pauseState.peripherals && !allHeld) {
+        const periph = d.peripherals || {};
+        if ($("displayList")) {
+            const dps = periph.displays || [];
+            $("displayList").innerHTML = dps.length
+                ? dps.map(dp => `
+                    <div class="sensor-row">
+                        <div><b>${esc(dp.connector)}</b><small>Primary: ${esc(dp.resolution)}</small></div>
+                        <span class="badge">${(dp.available_modes || []).length} modes</span>
+                    </div>
+                `).join("")
+                : '<div class="empty">No external displays connected.</div>';
         }
-        if (tbs.length) {
-            html += tbs.map(t => `
-                <div class="sensor-row"><div><b>⚡ ${esc(t.device)}</b></div><span class="badge" style="color:var(--accent);">${t.authorized ? "Authorized" : "Unauthorized"}</span></div>
-            `).join("");
+        if ($("usbList")) {
+            const usbs = periph.usb || [];
+            const tbs = periph.thunderbolt || [];
+            let html = "";
+            if (usbs.length) {
+                html += usbs.map(u => `
+                    <div class="sensor-row"><div><b>${esc(u)}</b></div><span class="badge">USB</span></div>
+                `).join("");
+            }
+            if (tbs.length) {
+                html += tbs.map(t => `
+                    <div class="sensor-row"><div><b>⚡ ${esc(t.device)}</b></div><span class="badge" style="color:var(--accent);">${t.authorized ? "Authorized" : "Unauthorized"}</span></div>
+                `).join("");
+            }
+            $("usbList").innerHTML = html || '<div class="empty">No USB or Thunderbolt devices found.</div>';
         }
-        $("usbList").innerHTML = html || '<div class="empty">No USB or Thunderbolt devices found.</div>';
     }
 
-    renderInterfaces(n.interfaces);
-    renderPhysicalDisks(d.physical_disks, d.filesystems);
-    renderDisks(d.filesystems);
-    renderSensors(d.sensors);
-    renderGpu(d.gpu);
-    renderBattery(d.battery);
+    if (!pauseState.net) renderInterfaces(n.interfaces);
+    if (!pauseState.disk) {
+        renderPhysicalDisks(d.physical_disks, d.filesystems);
+        renderDisks(d.filesystems);
+    }
+    if (!pauseState.sensors) renderSensors(d.sensors);
+    if (!allHeld) {
+        if (!pauseState.gpu) renderGpu(d.gpu);
+        if (!pauseState.battery) renderBattery(d.battery);
+    }
 
     refreshActiveTabCharts();
 }
@@ -1093,6 +1815,7 @@ function connect() {
             el.className = "status connected";
         }
         if ($("daemonStatusText")) $("daemonStatusText").textContent = "Connected";
+        syncHoldsToBackend();
     };
 
     ws.onclose = (e) => {

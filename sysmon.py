@@ -5,10 +5,11 @@ Modular, asynchronous, and designed for minimal CPU and memory footprints.
 """
 import asyncio
 import hmac
+import json
 import re
 import sys
 from contextlib import asynccontextmanager
-from typing import Optional, Set
+from typing import Optional, Set, Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException, status
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from pydantic import BaseModel
@@ -30,9 +31,27 @@ from diagnostics import (
 
 # Active connected WebSocket clients
 clients: Set[WebSocket] = set()
+# Per-client channel holds: WebSocket -> { "global": bool, "cpu": bool, ... }
+client_holds: Dict[WebSocket, Dict[str, bool]] = {}
 
 # Wakes up loops when at least one viewer is connected; pauses when idle
 has_active_viewers = asyncio.Event()
+# Wakes up collection loop immediately when client hold states change
+holds_changed = asyncio.Event()
+
+def get_effective_holds() -> Dict[str, bool]:
+    """
+    Compute effective holds across all active viewers.
+    A channel is held on the server only if ALL connected viewers have placed it on hold.
+    If at least one viewer has requested live telemetry for a channel, that channel remains live.
+    """
+    if not clients:
+        return {"global": True}
+    channels = ["global", "cpu", "mem", "processes", "net", "disk", "sensors", "overview", "system", "gpu", "battery", "peripherals"]
+    res = {}
+    for ch in channels:
+        res[ch] = all(client_holds.get(ws, {}).get(ch, False) for ws in clients)
+    return res
 
 hw_monitor = HardwareMonitor()
 net_monitor = NetworkMonitor()
@@ -44,8 +63,21 @@ async def broadcast_hardware_loop():
             has_active_viewers.clear()
             await has_active_viewers.wait()  # Sleep indefinitely with 0% CPU usage
 
-        # Run collection off the event loop thread
-        data = await hw_monitor.collect_async()
+        holds = get_effective_holds()
+        all_channels_held = holds.get("global") or all(
+            holds.get(ch, False) for ch in ("cpu", "mem", "processes", "net", "disk", "sensors")
+        )
+        if all_channels_held:
+            # All channels held: bypass all sampling and serialization to consume 0% CPU
+            try:
+                await asyncio.wait_for(holds_changed.wait(), timeout=POLL_SECONDS)
+                holds_changed.clear()
+            except asyncio.TimeoutError:
+                pass
+            continue
+
+        # Run collection off the event loop thread with active holds bypassed
+        data = await hw_monitor.collect_async(holds=holds)
 
         # Broadcast to all connected clients
         dead = set()
@@ -57,8 +89,13 @@ async def broadcast_hardware_loop():
 
         for ws in dead:
             clients.discard(ws)
+            client_holds.pop(ws, None)
 
-        await asyncio.sleep(POLL_SECONDS)
+        try:
+            await asyncio.wait_for(holds_changed.wait(), timeout=POLL_SECONDS)
+            holds_changed.clear()
+        except asyncio.TimeoutError:
+            pass
 
 async def broadcast_network_once():
     """Probe network targets and broadcast status to all active clients once."""
@@ -73,6 +110,7 @@ async def broadcast_network_once():
             dead.add(ws)
     for ws in dead:
         clients.discard(ws)
+        client_holds.pop(ws, None)
 
 async def broadcast_network_loop():
     """Periodically probe targets in the background only when viewers are connected."""
@@ -80,6 +118,11 @@ async def broadcast_network_loop():
         if not clients:
             has_active_viewers.clear()
             await has_active_viewers.wait()
+
+        holds = get_effective_holds()
+        if holds.get("global") or holds.get("net"):
+            await asyncio.sleep(4.0)
+            continue
 
         await broadcast_network_once()
         # Probe network targets every 4.0 seconds
@@ -113,17 +156,30 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
     clients.add(websocket)
+    client_holds[websocket] = {}
     has_active_viewers.set()  # Wake up collection loops
+    holds_changed.set()
 
     # Send an immediate snapshot of targets on connection
     asyncio.create_task(broadcast_network_once())
 
     try:
         while True:
-            # Keep connection open; clients can send keepalive pings
-            await websocket.receive_text()
+            # Keep connection open; receive client keepalives or hold_update events
+            msg_text = await websocket.receive_text()
+            if not msg_text:
+                continue
+            try:
+                msg = json.loads(msg_text)
+                if isinstance(msg, dict) and msg.get("type") == "hold_update":
+                    client_holds[websocket] = msg.get("holds", {})
+                    holds_changed.set()
+            except Exception:
+                pass
     except WebSocketDisconnect:
         clients.discard(websocket)
+        client_holds.pop(websocket, None)
+        holds_changed.set()
         if not clients:
             has_active_viewers.clear()
 

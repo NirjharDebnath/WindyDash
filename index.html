@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>WindyDash — A Laboratory Telemetry Instrumentation</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍁</text></svg>">
-  <link rel="stylesheet" href="styles.css?v=2.2">
+  <link rel="stylesheet" href="styles.css?v=2.3">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
+  <!-- Background Torii Gate & Mt. Fuji Ink Sketch Canvas -->
+  <canvas id="bg-sketch-canvas"></canvas>
+
+  <!-- Maple Leaves Particle Physics Animation Canvas -->
+  <canvas id="maple-canvas"></canvas>
+
   <!-- Top Application Bar -->
   <header class="topbar">
     <div class="topbar-brand-area">
@@ -34,11 +40,121 @@
           <span id="daemonStatusText">Offline</span>
         </span>
       </div>
+
+      <!-- Master Live/Hold Telemetry Switch -->
+      <button id="masterPauseBtn" class="pause-pill-btn" title="Toggle telemetry live stream / freeze snapshot (Shift+Space)">
+        <span class="pause-status-led" id="pauseLed"></span>
+        <span id="masterPauseText">LIVE</span>
+      </button>
+
+      <!-- Channel Settings Drawer Toggle -->
+      <button id="channelPauseToggleBtn" class="icon-btn" title="Telemetry Channel Hold Controls">
+        <span id="channelsIcon">⚙</span>
+      </button>
+
+      <button id="toggleLeavesBtn" class="icon-btn" title="Toggle falling leaves animation">
+        <span id="leavesIcon">🍁</span>
+      </button>
       <button id="themeToggle" class="icon-btn" title="Toggle dark/light theme">
         <span id="themeIcon">☼</span>
       </button>
     </div>
   </header>
+
+  <!-- Minimalist Telemetry Channel Hold Drawer (Pop-out Tray) -->
+  <aside id="pauseDrawer" class="pause-drawer" aria-label="Telemetry Stream Hold Controls" style="display: none;">
+    <div class="pause-drawer-header">
+      <div class="pause-drawer-title">
+        <span class="eyebrow">INSTRUMENTATION CONTROL</span>
+        <h3>Channel Hold Deck</h3>
+      </div>
+      <button id="closePauseDrawer" class="icon-btn tiny-icon-btn" title="Close Settings">✕</button>
+    </div>
+    <div class="pause-drawer-body">
+      <div class="pause-channel-row master-channel-row">
+        <div class="channel-info">
+          <span class="channel-icon">⏹</span>
+          <div>
+            <div class="channel-title">Master Snapshot Freeze</div>
+            <div class="channel-desc">Hold all metrics and time-series</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn master-toggle-btn" id="btnHoldGlobal" data-channel="global">LIVE</button>
+      </div>
+
+      <div class="pause-channel-divider"></div>
+
+      <div class="pause-channel-row" data-row="cpu">
+        <div class="channel-info">
+          <span class="channel-icon">⚡</span>
+          <div>
+            <div class="channel-title">Processor (CPU)</div>
+            <div class="channel-desc">Clocks, load %, & core activity</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn" id="btnHoldCpu" data-channel="cpu">LIVE</button>
+      </div>
+
+      <div class="pause-channel-row" data-row="mem">
+        <div class="channel-info">
+          <span class="channel-icon">▥</span>
+          <div>
+            <div class="channel-title">Memory & RAM</div>
+            <div class="channel-desc">Physical RAM, swap, and caches</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn" id="btnHoldMem" data-channel="mem">LIVE</button>
+      </div>
+
+      <div class="pause-channel-row" data-row="processes">
+        <div class="channel-info">
+          <span class="channel-icon">📋</span>
+          <div>
+            <div class="channel-title">Process Monitor</div>
+            <div class="channel-desc">Lock process table to inspect PIDs</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn" id="btnHoldProcesses" data-channel="processes">LIVE</button>
+      </div>
+
+      <div class="pause-channel-row" data-row="net">
+        <div class="channel-info">
+          <span class="channel-icon">🌐</span>
+          <div>
+            <div class="channel-title">Network Throughput</div>
+            <div class="channel-desc">Bandwidth rates & socket traffic</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn" id="btnHoldNet" data-channel="net">LIVE</button>
+      </div>
+
+      <div class="pause-channel-row" data-row="disk">
+        <div class="channel-info">
+          <span class="channel-icon">💾</span>
+          <div>
+            <div class="channel-title">Disk Storage & I/O</div>
+            <div class="channel-desc">Read/write throughput & storage</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn" id="btnHoldDisk" data-channel="disk">LIVE</button>
+      </div>
+
+      <div class="pause-channel-row" data-row="sensors">
+        <div class="channel-info">
+          <span class="channel-icon">🌡</span>
+          <div>
+            <div class="channel-title">Thermal Sensors</div>
+            <div class="channel-desc">Temperatures, fans & voltages</div>
+          </div>
+        </div>
+        <button class="channel-toggle-btn" id="btnHoldSensors" data-channel="sensors">LIVE</button>
+      </div>
+    </div>
+    <div class="pause-drawer-footer">
+      <button id="resumeAllChannelsBtn" class="action-btn-secondary">Resume All</button>
+      <button id="pauseAllChannelsBtn" class="action-btn-primary">Hold All</button>
+    </div>
+  </aside>
 
   <!-- Sticky Navigation Tabs -->
   <nav class="tabs" id="tabs">
@@ -724,6 +840,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.2"></script>
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>

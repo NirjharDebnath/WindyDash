@@ -56,6 +56,13 @@ class HardwareMonitor:
         self.last_fs_sample = 0.0
         self.cached_fs: List[Dict[str, Any]] = []
 
+        # Granular telemetry caches to enable 0% CPU consumption during channel hold
+        self.cached_cpu: Dict[str, Any] = {}
+        self.cached_memory: Dict[str, Any] = {}
+        self.cached_net: Dict[str, Any] = {}
+        self.cached_net_ext: Dict[str, Any] = {}
+        self.cached_disk: Dict[str, Any] = {}
+
         # Sensor topology cache (path & label cache to avoid re-globbing every tick)
         self.last_sensor_scan = 0.0
         self.cached_sensor_descriptors: List[Dict[str, Any]] = []
@@ -1071,99 +1078,37 @@ class HardwareMonitor:
             pass
         return out
 
-    def collect(self) -> Dict[str, Any]:
+    def collect(self, holds: Optional[Dict[str, bool]] = None) -> Dict[str, Any]:
         """
-        Execute synchronous hardware collection.
-        Optimized to complete in under 5ms (compared to 150-300ms previously).
+        Execute synchronous hardware collection with selective subsystem pausing.
+        When subsystems are on hold, expensive sampling is bypassed and cached results are served,
+        dropping daemon CPU usage to near 0%.
         """
+        holds = holds or {}
         now = time.monotonic()
         dt = max(now - self.prev_time, 0.001)
 
-        # GPU sampled every 4 seconds
-        if now - self.last_gpu_sample >= 4.0:
-            self.last_gpu_sample = now
-            self.cached_gpu = self._sample_gpu()
+        # 1. GPU sampled every 4 seconds (bypass if held)
+        if not holds.get("global") and not holds.get("gpu"):
+            if now - self.last_gpu_sample >= 4.0:
+                self.last_gpu_sample = now
+                self.cached_gpu = self._sample_gpu()
 
-        # Processes sampled every 3.5 seconds
-        processes = self._sample_processes()
+        # 2. Processes (Top CPU consumer!)
+        # If processes is held, skip psutil.process_iter entirely!
+        if holds.get("processes") and self.cached_proc:
+            processes = self.cached_proc
+        else:
+            processes = self._sample_processes()
 
-        mi = self.meminfo()
-        vm = psutil.virtual_memory()
-        sw = psutil.swap_memory()
-        freq = psutil.cpu_freq(percpu=True) or []
-        cpu = psutil.cpu_percent(None, percpu=True)
-        cfreq = [x.current for x in freq] if freq else []
-
-        n = psutil.net_io_counters(pernic=True)
-        d = psutil.disk_io_counters(perdisk=True)
-
-        rx = sum(x.bytes_recv for x in n.values())
-        tx = sum(x.bytes_sent for x in n.values())
-        oldrx = sum(x.bytes_recv for x in self.prev_net.values())
-        oldtx = sum(x.bytes_sent for x in self.prev_net.values())
-
-        read_bytes = sum(x.read_bytes for x in d.values())
-        write_bytes = sum(x.write_bytes for x in d.values())
-        oldread = sum(x.read_bytes for x in self.prev_disk.values())
-        oldwrite = sum(x.write_bytes for x in self.prev_disk.values())
-
-        net_ext = self.sample_network_ext()
-
-        # Per-interface transfer rates
-        if_addrs = psutil.net_if_addrs()
-        if_stats = psutil.net_if_stats()
-        interfaces = {}
-        for name, x in n.items():
-            addrs = if_addrs.get(name, [])
-            addr = next((a.address for a in addrs if a.family == socket.AF_INET), "")
-            o = self.prev_net.get(name)
-            rx_sec = max(0.0, (x.bytes_recv - o.bytes_recv) / dt) if o else 0.0
-            tx_sec = max(0.0, (x.bytes_sent - o.bytes_sent) / dt) if o else 0.0
-            
-            # RFC2863 operstate for loopback is kernel-defined as 'unknown', but psutil checks IFF_UP flag
-            stat_obj = if_stats.get(name)
-            if stat_obj:
-                state = "up" if stat_obj.isup else "down"
-                mtu = str(stat_obj.mtu or 1500)
-                speed_mbps = stat_obj.speed
-            else:
-                state = "up" if name == "lo" else "unknown"
-                mtu = "65536" if name == "lo" else "1500"
-                speed_mbps = 0
-            
-            if name == "lo":
-                state = "up"
-            
-            interfaces[name] = {
-                "rx_bytes": x.bytes_recv,
-                "tx_bytes": x.bytes_sent,
-                "rx_bytes_per_sec": rx_sec,
-                "tx_bytes_per_sec": tx_sec,
-                "address": addr or ("127.0.0.1" if name == "lo" else ""),
-                "state": state,
-                "mtu": mtu,
-                "speed_mbps": speed_mbps,
-                "drop_in": x.dropin,
-                "err_in": x.errin
-            }
-
-        self.prev_net = n
-        self.prev_disk = d
-        self.prev_time = now
-
-        load = os.getloadavg()
-        boot = psutil.boot_time()
-        thread_count = self._get_system_threads_count()
-
-        try:
-            open_files = len(psutil.Process().open_files())
-        except Exception:
-            open_files = 0
-
-        return {
-            "type": "hardware",
-            "timestamp": time.time(),
-            "cpu": {
+        # 3. CPU
+        if holds.get("cpu") and self.cached_cpu:
+            cpu_data = self.cached_cpu
+        else:
+            freq = psutil.cpu_freq(percpu=True) or []
+            cpu = psutil.cpu_percent(None, percpu=True)
+            cfreq = [x.current for x in freq] if freq else []
+            cpu_data = {
                 "global_percent": sum(cpu) / len(cpu) if cpu else 0.0,
                 "per_core_percent": cpu,
                 "per_core_freq_mhz": cfreq,
@@ -1173,8 +1118,17 @@ class HardwareMonitor:
                 "ctx_switches": psutil.cpu_stats().ctx_switches,
                 "model": self.cached_lscpu_details.get("model_name") or platform.processor(),
                 "details": self.cached_lscpu_details
-            },
-            "memory": {
+            }
+            self.cached_cpu = cpu_data
+
+        # 4. Memory
+        if holds.get("mem") and self.cached_memory:
+            memory_data = self.cached_memory
+        else:
+            mi = self.meminfo()
+            vm = psutil.virtual_memory()
+            sw = psutil.swap_memory()
+            memory_data = {
                 "total": vm.total,
                 "used": vm.used,
                 "available": vm.available,
@@ -1199,7 +1153,112 @@ class HardwareMonitor:
                 "swap_used": sw.used,
                 "swap_percent": sw.percent,
                 "hardware": self.cached_memory_hardware
-            },
+            }
+            self.cached_memory = memory_data
+
+        # 5. Network
+        if holds.get("net") and self.cached_net:
+            network_data = self.cached_net
+            net_ext = self.cached_net_ext
+        else:
+            n = psutil.net_io_counters(pernic=True)
+            rx = sum(x.bytes_recv for x in n.values())
+            tx = sum(x.bytes_sent for x in n.values())
+            oldrx = sum(x.bytes_recv for x in self.prev_net.values())
+            oldtx = sum(x.bytes_sent for x in self.prev_net.values())
+            net_ext = self.sample_network_ext()
+            self.cached_net_ext = net_ext
+
+            if_addrs = psutil.net_if_addrs()
+            if_stats = psutil.net_if_stats()
+            interfaces = {}
+            for name, x in n.items():
+                addrs = if_addrs.get(name, [])
+                addr = next((a.address for a in addrs if a.family == socket.AF_INET), "")
+                o = self.prev_net.get(name)
+                rx_sec = max(0.0, (x.bytes_recv - o.bytes_recv) / dt) if o else 0.0
+                tx_sec = max(0.0, (x.bytes_sent - o.bytes_sent) / dt) if o else 0.0
+                stat_obj = if_stats.get(name)
+                if stat_obj:
+                    state = "up" if stat_obj.isup else "down"
+                    mtu = str(stat_obj.mtu or 1500)
+                    speed_mbps = stat_obj.speed
+                else:
+                    state = "up" if name == "lo" else "unknown"
+                    mtu = "65536" if name == "lo" else "1500"
+                    speed_mbps = 0
+                if name == "lo":
+                    state = "up"
+                interfaces[name] = {
+                    "rx_bytes": x.bytes_recv,
+                    "tx_bytes": x.bytes_sent,
+                    "rx_bytes_per_sec": rx_sec,
+                    "tx_bytes_per_sec": tx_sec,
+                    "address": addr or ("127.0.0.1" if name == "lo" else ""),
+                    "state": state,
+                    "mtu": mtu,
+                    "speed_mbps": speed_mbps,
+                    "drop_in": x.dropin,
+                    "err_in": x.errin
+                }
+            self.prev_net = n
+            network_data = {
+                "bytes_sent": tx,
+                "bytes_recv": rx,
+                "packets_sent": sum(x.packets_sent for x in n.values()),
+                "packets_recv": sum(x.packets_recv for x in n.values()),
+                "rx_bytes_per_sec": max(0.0, (rx - oldrx) / dt),
+                "tx_bytes_per_sec": max(0.0, (tx - oldtx) / dt),
+                "interfaces": interfaces
+            }
+            self.cached_net = network_data
+
+        # 6. Disk & Filesystems
+        if holds.get("disk") and self.cached_disk:
+            disk_data = self.cached_disk
+            fs_data = self.cached_fs
+            phys_disks = self.cached_physical_disks
+        else:
+            d = psutil.disk_io_counters(perdisk=True)
+            read_bytes = sum(x.read_bytes for x in d.values())
+            write_bytes = sum(x.write_bytes for x in d.values())
+            oldread = sum(x.read_bytes for x in self.prev_disk.values())
+            oldwrite = sum(x.write_bytes for x in self.prev_disk.values())
+            self.prev_disk = d
+            disk_data = {
+                "read_bytes": read_bytes,
+                "write_bytes": write_bytes,
+                "read_count": sum(x.read_count for x in d.values()),
+                "write_count": sum(x.write_count for x in d.values()),
+                "read_bytes_per_sec": max(0.0, (read_bytes - oldread) / dt),
+                "write_bytes_per_sec": max(0.0, (write_bytes - oldwrite) / dt)
+            }
+            self.cached_disk = disk_data
+            fs_data = self.sample_filesystems()
+            phys_disks = self.sample_physical_disks()
+
+        # 7. Sensors
+        if holds.get("sensors") and self.cached_sensors:
+            sensors_data = self.cached_sensors
+        else:
+            sensors_data = self.sample_sensors()
+
+        self.prev_time = now
+
+        load = os.getloadavg()
+        boot = psutil.boot_time()
+        thread_count = self._get_system_threads_count()
+
+        try:
+            open_files = len(psutil.Process().open_files())
+        except Exception:
+            open_files = 0
+
+        return {
+            "type": "hardware",
+            "timestamp": time.time(),
+            "cpu": cpu_data,
+            "memory": memory_data,
             "system": {
                 "hostname": socket.gethostname(),
                 "os": self.cached_os_details.get("pretty_name") or "Linux",
@@ -1217,33 +1276,18 @@ class HardwareMonitor:
                 "open_files": open_files,
                 "details": self.cached_os_details
             },
-            "network": {
-                "bytes_sent": tx,
-                "bytes_recv": rx,
-                "packets_sent": sum(x.packets_sent for x in n.values()),
-                "packets_recv": sum(x.packets_recv for x in n.values()),
-                "rx_bytes_per_sec": max(0.0, (rx - oldrx) / dt),
-                "tx_bytes_per_sec": max(0.0, (tx - oldtx) / dt),
-                "interfaces": interfaces
-            },
-            "disk": {
-                "read_bytes": read_bytes,
-                "write_bytes": write_bytes,
-                "read_count": sum(x.read_count for x in d.values()),
-                "write_count": sum(x.write_count for x in d.values()),
-                "read_bytes_per_sec": max(0.0, (read_bytes - oldread) / dt),
-                "write_bytes_per_sec": max(0.0, (write_bytes - oldwrite) / dt)
-            },
-            "filesystems": self.sample_filesystems(),
-            "physical_disks": self.sample_physical_disks(),
-            "sensors": self.sample_sensors(),
+            "network": network_data,
+            "disk": disk_data,
+            "filesystems": fs_data,
+            "physical_disks": phys_disks,
+            "sensors": sensors_data,
             "battery": self.sample_batteries(),
             "gpu": self.cached_gpu,
             "processes": processes,
-            "peripherals": self.sample_peripherals(),
+            "peripherals": self.cached_periph if (holds.get("peripherals") or holds.get("global")) else self.sample_peripherals(),
             "network_ext": net_ext
         }
 
-    async def collect_async(self) -> Dict[str, Any]:
+    async def collect_async(self, holds: Optional[Dict[str, bool]] = None) -> Dict[str, Any]:
         """Run hardware collection off the main event loop to eliminate event loop latency."""
-        return await asyncio.to_thread(self.collect)
+        return await asyncio.to_thread(self.collect, holds)
