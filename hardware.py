@@ -80,11 +80,14 @@ class HardwareMonitor:
         Cached permanently at startup to incur 0.0ms telemetry overhead.
         """
         info = {
+            "distro_id": "linux",
             "distro_name": "Linux",
             "distro_version": "",
             "pretty_name": "Linux",
             "codename": "",
             "id_like": "",
+            "logo": "",
+            "system": platform.system().lower(),
             "kernel": platform.release(),
             "kernel_version": platform.version(),
             "arch": platform.machine(),
@@ -97,11 +100,13 @@ class HardwareMonitor:
 
         try:
             os_rel = platform.freedesktop_os_release()
+            info["distro_id"] = os_rel.get("ID", "linux").lower()
             info["distro_name"] = os_rel.get("NAME", "Linux")
             info["distro_version"] = os_rel.get("VERSION_ID", "")
             info["pretty_name"] = os_rel.get("PRETTY_NAME", os_rel.get("NAME", "Linux"))
             info["codename"] = os_rel.get("VERSION_CODENAME", "")
             info["id_like"] = os_rel.get("ID_LIKE", os_rel.get("ID", ""))
+            info["logo"] = os_rel.get("LOGO", "")
         except Exception:
             p = Path("/etc/os-release")
             if p.exists():
@@ -113,12 +118,16 @@ class HardwareMonitor:
                             info["pretty_name"] = v
                         elif k == "NAME" and info["distro_name"] == "Linux":
                             info["distro_name"] = v
+                        elif k == "ID":
+                            info["distro_id"] = v.lower()
                         elif k == "VERSION_ID":
                             info["distro_version"] = v
                         elif k == "VERSION_CODENAME":
                             info["codename"] = v
                         elif k == "ID_LIKE":
                             info["id_like"] = v
+                        elif k == "LOGO":
+                            info["logo"] = v
 
         try:
             libc_ver = platform.libc_ver()
