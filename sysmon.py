@@ -135,11 +135,11 @@ async def get_index():
 
 @app.get("/styles.css")
 async def get_css():
-    return FileResponse(BASE_DIR / "styles.css")
+    return FileResponse(BASE_DIR / "styles.css", headers={"Cache-Control": "no-cache"})
 
 @app.get("/app.js")
 async def get_js():
-    return FileResponse(BASE_DIR / "app.js")
+    return FileResponse(BASE_DIR / "app.js", headers={"Cache-Control": "no-cache"})
 
 @app.get("/favicon.ico")
 async def get_favicon():
