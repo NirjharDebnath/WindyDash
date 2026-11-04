@@ -91,6 +91,17 @@ body {
   background-repeat: no-repeat;
 }
 
+/* Background Torii Gate & Mountain Sketch Canvas */
+#bg-sketch-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* Maple Leaves Particle Canvas */
 #maple-canvas {
   position: fixed;
@@ -805,7 +816,8 @@ main {
 .action-btn-primary {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #120f0c;
+  color: #ffffff;
+  font-weight: 800;
   padding: 7px 13px;
   box-shadow: var(--btn-shadow);
 }
@@ -2323,7 +2335,129 @@ footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.pause-drawer-footer .action-btn-primary {
+  color: #ffffff !important;
+}
+
+/* --- Light Mode Scheme for Telemetry Hold Drawer --- */
+:root.light .pause-drawer {
+  background: #fbf9f5;
+  border: 1px solid rgba(194, 65, 12, 0.22);
+  box-shadow: 0 16px 44px -8px rgba(60, 45, 30, 0.20), 0 0 0 1px rgba(194, 65, 12, 0.12);
+}
+
+:root.light .pause-drawer-header {
+  background: #ffffff;
+  border-bottom: 1px solid rgba(194, 65, 12, 0.14);
+}
+
+:root.light .pause-drawer-title h3 {
+  color: #2c251f;
+}
+
+:root.light .pause-drawer-body {
+  background: #f7f3ea;
+}
+
+/* Rows in light mode: Always pure white by default, never dark/muddy */
+:root.light .pause-channel-row {
+  background: #ffffff;
+  border: 1px solid rgba(194, 65, 12, 0.14);
+  box-shadow: 0 1px 3px rgba(60, 45, 30, 0.05);
+}
+
+:root.light .pause-channel-row:hover {
+  background: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(194, 65, 12, 0.14);
+}
+
+:root.light .master-channel-row {
+  background: #ffffff;
+  border: 1px solid rgba(194, 65, 12, 0.28);
+  box-shadow: 0 1px 4px rgba(194, 65, 12, 0.08);
+}
+
+:root.light .pause-channel-row.is-paused {
+  background: #ffffff;
+  border-color: rgba(194, 65, 12, 0.55);
+  box-shadow: 0 0 0 1px rgba(194, 65, 12, 0.20), 0 1px 4px rgba(194, 65, 12, 0.10);
+}
+
+:root.light .channel-title {
+  color: #2c251f;
+}
+
+:root.light .channel-desc {
+  color: #7c7263;
+}
+
+:root.light .channel-icon {
+  color: var(--accent);
+}
+
+:root.light .pause-channel-divider {
+  background: rgba(194, 65, 12, 0.15);
+}
+
+/* Light Mode Toggle Buttons */
+:root.light .channel-toggle-btn {
+  background: rgba(21, 128, 61, 0.08);
+  border: 1px solid rgba(21, 128, 61, 0.35);
+  color: #15803d;
+}
+
+:root.light .channel-toggle-btn:hover {
+  background: rgba(21, 128, 61, 0.18);
+  border-color: #15803d;
+}
+
+:root.light .channel-toggle-btn.is-held {
+  background: rgba(194, 65, 12, 0.12);
+  border: 1px solid rgba(194, 65, 12, 0.55);
+  color: #c2410c;
+}
+
+:root.light .channel-toggle-btn.is-held:hover {
+  background: rgba(194, 65, 12, 0.22);
+  border-color: #c2410c;
+}
+
+/* Light Mode Drawer Footer */
+:root.light .pause-drawer-footer {
+  background: #ffffff;
+  border-top: 1px solid rgba(194, 65, 12, 0.15);
+}
+
+:root.light .pause-drawer-footer .action-btn-secondary {
+  background: #f7f3ea;
+  border: 1px solid rgba(194, 65, 12, 0.22);
+  color: #2c251f;
+  font-weight: 800;
+  box-shadow: 0 1px 2px rgba(60, 45, 30, 0.06);
+}
+
+:root.light .pause-drawer-footer .action-btn-secondary:hover {
+  background: #ffffff;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+:root.light .pause-drawer-footer .action-btn-primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #ffffff !important;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(194, 65, 12, 0.28);
+}
+
+:root.light .pause-drawer-footer .action-btn-primary:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-light);
+  color: #ffffff !important;
 }
 
 .tiny-icon-btn {

@@ -458,8 +458,13 @@ function initBackgroundSketch() {
 
         canvas.width = Math.round(w * dpr);
         canvas.height = Math.round(h * dpr);
-        canvas.style.width = `${w}px`;
-        canvas.style.height = `${h}px`;
+        canvas.style.position = "fixed";
+        canvas.style.top = "0";
+        canvas.style.left = "0";
+        canvas.style.width = "100vw";
+        canvas.style.height = "100vh";
+        canvas.style.pointerEvents = "none";
+        canvas.style.zIndex = "0";
 
         ctx.save();
         ctx.scale(dpr, dpr);
@@ -471,8 +476,9 @@ function initBackgroundSketch() {
         const scale = Math.min(w / 1200, h / 800, 1.0);
         const s = Math.max(0.65, Math.min(scale, 1.15));
 
+        // Center composition in the background middle behind everything
         const cx = Math.round(w * 0.5);
-        const baseY = Math.round(h * 0.70);
+        const baseY = Math.round(h * 0.50 + 85 * s);
 
         // 1. Celestial Sun/Moon Disc (Enso glow behind Mt. Fuji)
         const peakY = baseY - 180 * s;
