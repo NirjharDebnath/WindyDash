@@ -130,14 +130,24 @@ if (savedTheme === "light") {
 const navToggle = document.getElementById("navToggle");
 const navLinks = document.getElementById("navLinks");
 if (navToggle && navLinks) {
-    navToggle.addEventListener("click", () => {
-        const open = navLinks.classList.toggle("is-open");
+    const menuIcon = navToggle.querySelector(".menu-icon");
+    const setMenuState = (open) => {
+        navLinks.classList.toggle("is-open", open);
         navToggle.setAttribute("aria-expanded", String(open));
+        if (menuIcon) menuIcon.textContent = open ? "×" : "☰";
+    };
+    navToggle.addEventListener("click", () => {
+        setMenuState(!navLinks.classList.contains("is-open"));
     });
     navLinks.querySelectorAll("a").forEach(link => link.addEventListener("click", () => {
-        navLinks.classList.remove("is-open");
-        navToggle.setAttribute("aria-expanded", "false");
+        setMenuState(false);
     }));
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") setMenuState(false);
+    });
+    window.addEventListener("resize", () => {
+        if (window.innerWidth > 1100) setMenuState(false);
+    }, { passive: true });
 }
 
 // --- 5. Atmospheric Mt. Fuji and torii ink sketch ---

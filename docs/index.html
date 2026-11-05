@@ -20,7 +20,10 @@
         <div class="brand-icon">🍁</div>
         <div class="brand-text">WindyDash <span style="font-size: 11px; color: var(--accent); font-weight: bold;">MK-II</span></div>
       </div>
-      <button id="navToggle" class="btn btn-icon nav-toggle" aria-expanded="false" aria-controls="navLinks">☰<span class="sr-only">Open navigation</span></button>
+      <button id="navToggle" class="btn btn-icon nav-toggle" aria-expanded="false" aria-controls="navLinks" aria-label="Toggle navigation">
+        <span class="menu-icon" aria-hidden="true">☰</span>
+        <span class="sr-only">Toggle navigation</span>
+      </button>
       <div class="nav-links" id="navLinks">
         <a href="#overview" class="nav-link">Overview</a>
         <a href="#features" class="nav-link">Features</a>

@@ -145,12 +145,14 @@ a:hover {
   justify-content: space-between;
   align-items: center;
   padding: 16px 0;
+  min-width: 0;
 }
 
 .brand-badge {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .brand-icon {
@@ -172,6 +174,7 @@ a:hover {
   text-transform: uppercase;
   color: var(--text);
   letter-spacing: -0.02em;
+  white-space: nowrap;
 }
 
 .nav-links {
@@ -181,6 +184,10 @@ a:hover {
 }
 
 .nav-toggle { display: none; }
+
+.nav-links .btn-icon {
+  flex: 0 0 auto;
+}
 
 .nav-link {
   font-size: 12px;
@@ -694,9 +701,8 @@ section { scroll-margin-top: 92px; }
   .overview-grid, .workflow { grid-template-columns: repeat(2, 1fr); }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1100px) {
   .container { padding: 0 16px; }
-  .features-grid { grid-template-columns: 1fr; }
   .nav-inner { flex-wrap: wrap; gap: 10px; }
   .nav-toggle { display: inline-flex; margin-left: auto; }
   .nav-links {
@@ -706,10 +712,17 @@ section { scroll-margin-top: 92px; }
     align-items: stretch;
     gap: 2px;
     padding-top: 8px;
+    padding-bottom: 8px;
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--panel) 96%, transparent);
   }
   .nav-links.is-open { display: flex; }
   .nav-link { padding: 9px 4px; border-bottom: 1px solid var(--border); }
   .nav-links .btn { justify-content: center; margin-top: 8px; }
+}
+
+@media (max-width: 768px) {
+  .features-grid { grid-template-columns: 1fr; }
   .hero h1 { font-size: clamp(28px, 8vw, 38px); }
   .hero p { font-size: 13px; }
   .hero-stats { grid-template-columns: repeat(3, 1fr); gap: 7px; }
