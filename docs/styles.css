@@ -61,11 +61,38 @@ body {
   letter-spacing: -0.015em;
   min-height: 100vh;
   transition: background 0.25s ease, color 0.25s ease;
+  position: relative;
+  overflow-x: hidden;
 }
 
 :root.light body {
   background-image: radial-gradient(circle at 50% 0%, rgba(194, 65, 12, 0.03) 0%, transparent 60%);
   background-size: 100% 100%;
+}
+
+#bg-sketch-canvas,
+#maple-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+#bg-sketch-canvas { z-index: 0; }
+#maple-canvas { z-index: 1; }
+.navbar, .hero, main, footer { position: relative; z-index: 2; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Custom Scrollbar */
@@ -153,6 +180,8 @@ a:hover {
   align-items: center;
 }
 
+.nav-toggle { display: none; }
+
 .nav-link {
   font-size: 12px;
   font-weight: 750;
@@ -212,7 +241,7 @@ a:hover {
 
 /* Hero Section */
 .hero {
-  padding: 70px 0 50px;
+  padding: clamp(48px, 8vw, 88px) 0 50px;
   text-align: center;
 }
 
@@ -263,6 +292,26 @@ a:hover {
   color: var(--muted);
   line-height: 1.6;
 }
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 150px));
+  justify-content: center;
+  gap: 12px;
+  margin: 0 auto 30px;
+}
+
+.hero-stats div {
+  padding: 12px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.hero-stats strong, .hero-stats span { display: block; }
+.hero-stats strong { color: var(--accent); font-size: 19px; }
+.hero-stats span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 
 /* Copiable Bash Command Hero Box */
 .command-hero-box {
@@ -324,6 +373,84 @@ a:hover {
   text-align: center;
   margin: 60px 0 35px;
 }
+
+.overview-grid, .use-cases-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.overview-card, .use-case {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.overview-number {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.overview-card h3, .use-case h3 { margin: 8px 0 6px; font-size: 15px; text-transform: uppercase; }
+.overview-card p, .use-case p { color: var(--muted); margin: 0; font-size: 12.5px; }
+
+.workflow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  position: relative;
+}
+
+.workflow-step {
+  display: flex;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.workflow-step > span {
+  flex: 0 0 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #120f0c;
+  background: var(--accent);
+  font-weight: 900;
+}
+
+.workflow-step h3 { margin: 0 0 5px; font-size: 14px; text-transform: uppercase; }
+.workflow-step p { margin: 0; color: var(--muted); font-size: 12px; }
+.use-cases-grid { grid-template-columns: repeat(3, 1fr); }
+
+.telemetry-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 16px;
+}
+
+.telemetry-list div {
+  display: grid;
+  grid-template-columns: 145px 1fr;
+  gap: 14px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 7px 7px 0;
+}
+
+.telemetry-list strong { font-size: 12px; text-transform: uppercase; color: var(--text); }
+.telemetry-list span { color: var(--muted); font-size: 12px; }
 
 .section-eyebrow {
   font-size: 10.5px;
@@ -407,6 +534,15 @@ a:hover {
   margin: 0;
   line-height: 1.55;
 }
+
+.feature-card .feature-credit {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 11.5px;
+}
+
+.feature-credit strong { color: var(--text); }
 
 /* Interactive .env Configuration Builder */
 .env-builder-grid {
@@ -549,17 +685,49 @@ footer {
   align-items: center;
 }
 
+section { scroll-margin-top: 92px; }
+
 /* Responsive Breakpoints */
 @media (max-width: 1024px) {
   .features-grid { grid-template-columns: repeat(2, 1fr); }
   .env-builder-grid { grid-template-columns: 1fr; }
+  .overview-grid, .workflow { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 768px) {
+  .container { padding: 0 16px; }
   .features-grid { grid-template-columns: 1fr; }
-  .nav-inner { flex-direction: column; gap: 12px; align-items: flex-start; }
-  .nav-links { width: 100%; justify-content: space-between; flex-wrap: wrap; }
-  .hero h1 { font-size: 32px; }
+  .nav-inner { flex-wrap: wrap; gap: 10px; }
+  .nav-toggle { display: inline-flex; margin-left: auto; }
+  .nav-links {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding-top: 8px;
+  }
+  .nav-links.is-open { display: flex; }
+  .nav-link { padding: 9px 4px; border-bottom: 1px solid var(--border); }
+  .nav-links .btn { justify-content: center; margin-top: 8px; }
+  .hero h1 { font-size: clamp(28px, 8vw, 38px); }
+  .hero p { font-size: 13px; }
+  .hero-stats { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .hero-stats strong { font-size: 16px; }
+  .hero-stats span { font-size: 8px; }
   .command-content { flex-direction: column; align-items: stretch; }
+  .command-text { width: 100%; font-size: 11px; }
+  .command-bar { align-items: flex-start; gap: 8px; flex-direction: column; }
+  .overview-grid, .workflow, .use-cases-grid, .telemetry-list { grid-template-columns: 1fr; }
+  .section-title { font-size: 22px; }
+  .section-title-wrap { margin: 46px 0 24px; }
+  .env-builder-grid { padding: 16px; }
+  .guide-step { padding: 16px; }
+  .code-snippet { align-items: flex-start; gap: 10px; flex-direction: column; overflow-wrap: anywhere; }
+  .telemetry-list div { grid-template-columns: 1fr; gap: 4px; }
   .footer-content { flex-direction: column; gap: 12px; text-align: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

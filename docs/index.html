@@ -10,6 +10,9 @@
 </head>
 <body>
 
+  <canvas id="bg-sketch-canvas" aria-hidden="true"></canvas>
+  <canvas id="maple-canvas" aria-hidden="true"></canvas>
+
   <!-- Top Navigation Bar -->
   <nav class="navbar">
     <div class="container nav-inner">
@@ -17,8 +20,11 @@
         <div class="brand-icon">🍁</div>
         <div class="brand-text">WindyDash <span style="font-size: 11px; color: var(--accent); font-weight: bold;">MK-II</span></div>
       </div>
-      <div class="nav-links">
+      <button id="navToggle" class="btn btn-icon nav-toggle" aria-expanded="false" aria-controls="navLinks">☰<span class="sr-only">Open navigation</span></button>
+      <div class="nav-links" id="navLinks">
+        <a href="#overview" class="nav-link">Overview</a>
         <a href="#features" class="nav-link">Features</a>
+        <a href="#how-it-works" class="nav-link">How It Works</a>
         <a href="#quickstart" class="nav-link">Quick Start</a>
         <a href="#env-builder" class="nav-link">.env Builder</a>
         <a href="#operators" class="nav-link">Operators</a>
@@ -42,10 +48,15 @@
       </div>
       <h1>Low Latency.<br>Hardware Precision. Zero Bloat.</h1>
       <p>
-        A lightweight Linux system telemetry monitor and active network diagnostic suite. 
-        Engineered with sub-6ms hardware collection, sleep-on-idle zero CPU waste, 
-        and authentic amber phosphor instrumentation.
+        WindyDash turns a Linux host into a focused telemetry and network operations console.
+        Watch hardware health, investigate connectivity, and operate the service from one
+        lightweight dashboard designed for servers, homelabs, and workstations.
       </p>
+      <div class="hero-stats" aria-label="WindyDash highlights">
+        <div><strong>&lt;6ms</strong><span>hardware collection</span></div>
+        <div><strong>0%</strong><span>idle background CPU</span></div>
+        <div><strong>24/7</strong><span>systemd operation</span></div>
+      </div>
 
       <!-- Copiable Bash Quick-Install Hero Box -->
       <div class="command-hero-box" id="quickstart">
@@ -78,6 +89,35 @@
 
   <main class="container">
 
+    <section id="overview" class="overview-section">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">THE OPERATOR'S VIEW</div>
+        <h2 class="section-title">One console for health, reachability, and action</h2>
+        <p class="section-desc">WindyDash collects local machine signals and actively tests the services that matter to you, then presents both in a single authenticated web interface.</p>
+      </div>
+      <div class="overview-grid">
+        <article class="overview-card"><span class="overview-number">01</span><h3>Observe</h3><p>CPU, memory, storage, network traffic, temperatures, GPU, battery, peripherals, and processes are organized into live dashboard views.</p></article>
+        <article class="overview-card"><span class="overview-number">02</span><h3>Verify</h3><p>Add hosts and services to TingPing to measure ICMP, TCP, or HTTP(S) reachability with clear latency and offline states.</p></article>
+        <article class="overview-card"><span class="overview-number">03</span><h3>Diagnose</h3><p>Run traceroute, subnet discovery, DNS resolution, port checks, and bandwidth tests when a problem needs deeper context.</p></article>
+        <article class="overview-card"><span class="overview-number">04</span><h3>Operate</h3><p>Protect access with SQLite-backed operator accounts, run as a systemd daemon, and stream service status and logs from the terminal.</p></article>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="how-section">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">FROM HOST TO DASHBOARD</div>
+        <h2 class="section-title">How WindyDash works</h2>
+        <p class="section-desc">The system keeps fast local sampling separate from slower work, so the dashboard stays useful without becoming another heavy workload.</p>
+      </div>
+      <div class="workflow">
+        <div class="workflow-line" aria-hidden="true"></div>
+        <article class="workflow-step"><span>1</span><div><h3>Collect</h3><p>Linux <code>/proc</code>, <code>/sys</code>, sensors, storage, and process data are read by the hardware collector.</p></div></article>
+        <article class="workflow-step"><span>2</span><div><h3>Probe</h3><p>Async network checks run concurrently and persist target definitions in SQLite for repeatable monitoring.</p></div></article>
+        <article class="workflow-step"><span>3</span><div><h3>Stream</h3><p>FastAPI REST endpoints and a WebSocket feed deliver live snapshots and NDJSON diagnostic results to the browser.</p></div></article>
+        <article class="workflow-step"><span>4</span><div><h3>Sleep</h3><p>When no dashboard clients are connected, collection and probing pause to avoid unnecessary CPU use and network traffic.</p></div></article>
+      </div>
+    </section>
+
     <!-- Feature Matrix Showcase -->
     <section id="features">
       <div class="section-title-wrap">
@@ -102,6 +142,12 @@
           <h3>TingPing Prober Engine</h3>
           <p>
             Concurrent, non-blocking network probe engine performing ICMP Ping, TCP handshake, and HTTP/HTTPS status tests with dynamic latency badges (<35ms fast, <100ms good, <250ms warn, down).
+          </p>
+          <p class="feature-credit">
+            <strong>Project credit:</strong> The idea for this prober was taken from
+            <a href="https://github.com/dwaidatta/ting-ping" target="_blank" rel="noopener">Ting-Ping by Dwaidatta</a>.
+            See the project in action at
+            <a href="https://www.dwaidatta.in/ting-ping/" target="_blank" rel="noopener">dwaidatta.in/ting-ping</a>.
           </p>
         </article>
 
@@ -149,6 +195,34 @@
             Switch seamlessly between <strong>Amber Phosphor CRT</strong> dark mode (with cathode vignette and glowing filament indicators) and <strong>Technical Parchment</strong> light mode (with Olivetti typewriter typography).
           </p>
         </article>
+      </div>
+    </section>
+
+    <section id="telemetry-surface" class="telemetry-section">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">EVERYDAY TELEMETRY SURFACE</div>
+        <h2 class="section-title">What the dashboard can show</h2>
+        <p class="section-desc">Open the matching dashboard view when you need detail, or use Overview for a compact operational snapshot.</p>
+      </div>
+      <div class="telemetry-list">
+        <div><strong>Processor</strong><span>utilization, per-core frequency, load, topology, caches, virtualization, instruction flags, and mitigations</span></div>
+        <div><strong>Memory & storage</strong><span>RAM, swap, cache pressure, filesystem capacity, disk throughput, and I/O activity</span></div>
+        <div><strong>Connectivity</strong><span>interface rates, local/public IP, gateway reachability, probe targets, and latency history</span></div>
+        <div><strong>Hardware</strong><span>temperatures, fans, voltages, NVIDIA GPU data, battery health, displays, USB, and Thunderbolt devices</span></div>
+        <div><strong>Processes</strong><span>top CPU and memory consumers with live filtering so an operator can find a noisy process quickly</span></div>
+        <div><strong>Diagnostics</strong><span>streaming traceroute, subnet discovery, DNS records, TCP ports, and Cloudflare download/upload speed tests</span></div>
+      </div>
+    </section>
+
+    <section id="use-cases" class="use-cases-section">
+      <div class="section-title-wrap">
+        <div class="section-eyebrow">BUILT FOR PRACTICAL OPERATIONS</div>
+        <h2 class="section-title">Where to use WindyDash</h2>
+      </div>
+      <div class="use-cases-grid">
+        <article class="use-case"><h3>Homelabs & self-hosting</h3><p>Keep an eye on a small server, NAS, Raspberry Pi, or virtualization host without deploying a full observability stack.</p></article>
+        <article class="use-case"><h3>Linux workstations</h3><p>Inspect thermals, processes, disks, GPUs, and peripherals while troubleshooting performance or hardware behavior.</p></article>
+        <article class="use-case"><h3>Network operations</h3><p>Track important endpoints and use built-in diagnostics to separate local, DNS, route, port, and upstream problems.</p></article>
       </div>
     </section>
 
